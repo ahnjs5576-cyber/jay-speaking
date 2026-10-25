@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Jay 따라 말하기</title>
+<title>인터뷰 따라 말하기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -158,6 +158,16 @@ textarea {
 .alt-flag { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: 0.85rem; color: var(--muted); }
 .linkbtn { border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
 .auto { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.pick select { font-weight: 600; color: var(--accent); border-color: var(--line); padding: 3px 6px; max-width: 220px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lib { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lib li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; }
+.lib .open { text-align: left; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 10px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; min-width: 0; font: inherit; }
+.lib .open[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.lib .open b { font-size: 0.88rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib .open span { font-size: 0.75rem; color: var(--muted); }
+.lib .del { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 6px 8px; border-radius: 8px; font: inherit; font-size: 0.78rem; }
+.lib .del:hover, .lib .del.confirm { color: var(--bad); background: var(--bad-soft); }
 .banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; }
 .stats { display: flex; gap: 18px; flex-wrap: wrap; }
 .stats div { display: grid; }
@@ -169,8 +179,8 @@ textarea {
 <div class="wrap">
   <header>
     <div>
-      <h1>Jay <span>따라 말하기</span></h1>
-      <p class="sub">문장을 듣고, 따라 말하면 단어별로 발음을 체크해요.</p>
+      <h1>인터뷰 <span>따라 말하기</span></h1>
+      <p class="sub">인터뷰 대본을 넣으면 인터뷰받는 사람의 말로 듣고 따라 말하며 발음을 체크해요.</p>
     </div>
     <div class="stats" id="stats"></div>
   </header>
@@ -180,7 +190,9 @@ textarea {
   <div class="grid">
     <main class="panel" id="practice">
       <div class="card-top">
-        <span class="speaker" id="speakerName">Jay</span>
+        <span class="speaker"><span id="speakerName">예시</span>
+          <label class="pick" id="speakerPick" hidden for="speakerSel"><span class="visually-hidden">연습할 사람</span><select id="speakerSel"></select></label>
+        </span>
         <span class="counter" id="counter">1 / 1</span>
       </div>
       <div class="sentence" id="sentence" lang="en"></div>
@@ -263,19 +275,25 @@ textarea {
 
     <aside class="side">
       <section class="panel" style="display:grid;gap:10px">
-        <div class="label">스크립트 불러오기</div>
-        <p class="note"><b>lesson.json</b>(교정된 Jay 문장) 또는 대본 .txt 파일을 열거나, 대본을 붙여넣으세요. 화자 이름이 붙은 줄에서 선택한 사람의 대사만 뽑아요.</p>
-        <textarea id="scriptInput" placeholder="Jay: Hey, how's it going?&#10;Sarah: Pretty good!&#10;Jay: Nice. Let's get started."></textarea>
+        <div class="label">인터뷰 추가</div>
+        <p class="note">인터뷰 대본 파일(.txt)을 열거나 내용을 붙여넣으세요. 대사 앞에 “이름:”이 붙어 있으면 인터뷰받는 사람을 자동으로 찾아 그 사람의 말만 뽑아요.</p>
         <div class="row">
-          <label class="note" for="speakerInput">화자</label>
-          <input type="text" id="speakerInput" value="Jay">
+          <label class="btn primary" for="fileInput">파일 열기</label>
+          <input type="file" id="fileInput" accept=".txt,.srt,.vtt,.md,.json,text/plain,application/json" multiple hidden>
         </div>
+        <textarea id="scriptInput" placeholder="Interviewer: What do you do?&#10;Sarah: I'm a designer at a small studio.&#10;Interviewer: How did you start?&#10;Sarah: I started by building things for fun."></textarea>
         <div class="row">
-          <button class="btn primary" id="loadBtn" type="button">대사 추출</button>
-          <label class="btn" for="fileInput">파일 열기</label>
-          <input type="file" id="fileInput" accept=".json,.txt,.srt,.vtt,application/json,text/plain" hidden>
+          <button class="btn" id="loadBtn" type="button">붙여넣은 대본 추가</button>
         </div>
         <p class="note" id="loadMsg"></p>
+      </section>
+
+      <section class="panel" style="display:grid;gap:10px">
+        <div class="row" style="justify-content:space-between">
+          <div class="label">내 인터뷰</div>
+          <span class="note" id="libNote"></span>
+        </div>
+        <ul class="lib" id="lib"></ul>
       </section>
 
       <section class="panel" style="display:grid;gap:10px">
@@ -295,7 +313,7 @@ textarea {
   const $ = (id) => document.getElementById(id);
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
   };
 
   // Example lines shown until a real script is loaded (written for this app, not from the video).
@@ -307,7 +325,18 @@ textarea {
     "Let me know what you think in the comments below."
   ];
 
-  let state = store.get("jay.state", null) || { speaker: "Jay", lines: SAMPLE, isSample: true, idx: 0, scores: {} };
+  const SAMPLE_STATE = () => ({ id: "sample", title: "예시 문장", speaker: "예시", lines: SAMPLE, isSample: true, idx: 0, scores: {} });
+  // library: { current: id, items: { id: interview } }; each interview keeps its own raw text, sentences and scores.
+  let library = store.get("shadow.library", null);
+  if (!library) {
+    library = { current: null, items: {} };
+    const old = store.get("jay.state", null);              // earlier single-script version
+    if (old && !old.isSample && Array.isArray(old.lines)) {
+      old.id = "i" + Date.now(); old.title = old.title || (old.speaker || "Jay") + " 인터뷰"; old.added = Date.now();
+      library.items[old.id] = old; library.current = old.id;
+    }
+  }
+  let state = library.items[library.current] || SAMPLE_STATE();
 
   /* ---------- script parsing ---------- */
   function cleanText(raw) {
@@ -343,40 +372,69 @@ textarea {
     return { text, used };
   }
 
-  function extractSpeaker(raw, name) {
+  // Reads a transcript with "Name: text" lines into speakers, plus who the interviewee is.
+  const META_LABEL = /^(note|notes|source|youtube|video ?id|channel|title|date|url|link|transcript|description|summary|tags?|language|duration|recorded)$/i;
+  const GUEST_ROLE = /^(interviewee|guest|guests|speaker|게스트|출연자|인터뷰이|인터뷰 대상)$/i;
+  const HOST_ROLE = /^(interviewer|host|moderator|mc|q|question|진행자|인터뷰어|사회자)$/i;
+  const looksLikeName = (v) => {
+    const t = v.replace(/\(.*?\)/g, "").trim();
+    return !!t && t.split(/\s+/).length <= 4 && !/[.,?!]/.test(t) && t.split(/\s+/).every(w => /^[A-Z가-힣]/.test(w));
+  };
+  const nameMatch = (label, full) => {
+    const a = label.toLowerCase().trim(), f = full.toLowerCase().replace(/\(.*?\)/g, "").trim();
+    return a === f || f.split(/\s+/).includes(a) || a.split(/\s+/)[0] === f.split(/\s+/)[0];
+  };
+
+  function parseScript(raw) {
     const text = normalizeQuotes(cleanText(raw));
-    const nameRe = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // Speaker label: "Jay:", "JAY -", "[Jay]", ">> Jay:"
-    const labelRe = /^\s*(?:>>\s*)?\[?([A-Za-z][A-Za-z .'-]{0,30}?)\]?\s*[:：\-–—]\s+(.*)$/;
-    const onlyName = /^\s*(?:>>\s*)?\[?([A-Za-z][A-Za-z .'-]{0,30}?)\]?\s*[:：]?\s*$/;
-    const target = new RegExp("^" + nameRe + "$", "i");
-    let current = null, found = false;
-    const chunks = [];
+    const labelRe = /^\s*(?:>>\s*)?\[?([A-Za-z가-힣][A-Za-z가-힣 .'-]{0,30}?)\]?\s*[:：\-–—]\s+(.*)$/;
+    const onlyName = /^\s*(?:>>\s*)?\[?([A-Za-z가-힣][A-Za-z가-힣 .'-]{0,30}?)\]?\s*[:：]?\s*$/;
+    const speakers = new Map();
+    let current = null, guestName = null, hostName = null, firstLine = null;
+    const say = (label, body) => {
+      const key = label.toLowerCase();
+      if (!speakers.has(key)) speakers.set(key, { name: label, chunks: [], words: 0 });
+      const sp = speakers.get(key);
+      if (sp.name === sp.name.toUpperCase() && label !== label.toUpperCase()) sp.name = label;  // prefer "Jay" over "JAY"
+      if (body) { sp.chunks.push(body); sp.words += body.split(/\s+/).length; }
+      current = sp;
+    };
     for (const lineRaw of text.split(/\r?\n/)) {
       const line = lineRaw.trim();
-      if (!line) continue;
+      if (!line || /^[=\-_*#]{3,}$/.test(line)) { if (line) current = null; continue; }
       let m = line.match(labelRe);
-      if (m && m[1].split(" ").length <= 3) {
-        current = m[1].trim(); found = true;
-        if (target.test(current)) chunks.push(m[2]);
+      if (m && m[1].trim().split(" ").length <= 3) {
+        const label = m[1].trim(), body = m[2].trim();
+        if (META_LABEL.test(label)) { current = null; continue; }
+        if (GUEST_ROLE.test(label) && looksLikeName(body)) { guestName = guestName || body.replace(/\(.*?\)/g, "").trim(); current = null; continue; }
+        if (HOST_ROLE.test(label) && looksLikeName(body)) { hostName = hostName || body.replace(/\(.*?\)/g, "").trim(); current = null; continue; }
+        say(label, body);
         continue;
       }
       m = line.match(onlyName);
-      if (m && /[:：]$/.test(line) || (m && line.length < 25 && /^[A-Z]/.test(line) && line === line.toUpperCase())) {
-        current = m[1].trim(); found = true; continue;
+      if (m && (/[:：]$/.test(line) || (line.length < 25 && /^[A-Z]/.test(line) && line === line.toUpperCase()))) {
+        if (META_LABEL.test(m[1].trim()) || /^(end|end of transcript|intro|outro)$/i.test(m[1].trim())) current = null;
+        else say(m[1].trim(), "");
+        continue;
       }
-      if (current && target.test(current)) chunks.push(line);
+      if (/^\[[^\]]*\]$/.test(line) || /^\(.*\)$/.test(line)) continue;   // [00:12], [music], (applause)
+      if (current) current.chunks.push(line), current.words += line.split(/\s+/).length;
+      else if (!firstLine && line.length <= 120) firstLine = line;
     }
-    const spoken = tidy(chunks.join(" "));
-    const { text: fixedText, used } = applyCorrections(spoken);
-    const spokenSet = new Set(splitSentences(spoken));
-    const sentences = [], fixes = [];
-    for (const s of splitSentences(fixedText)) {
-      if (s.split(" ").length < 3) continue;          // drop "Yeah." / "Both." style replies
-      sentences.push(s);
-      fixes.push(spokenSet.has(s) ? [] : used.filter(([, to]) => s.includes(to) || to.includes(s)));
-    }
-    return { found, sentences, fixes, fixCount: used.length };
+    const list = [...speakers.values()].filter(sp => sp.words > 0);
+    const isHost = (sp) => HOST_ROLE.test(sp.name) || (hostName && nameMatch(sp.name, hostName));
+    let interviewee = null;
+    if (guestName) interviewee = list.find(sp => !HOST_ROLE.test(sp.name) && nameMatch(sp.name, guestName));
+    interviewee = interviewee || list.find(sp => /^(a|answer|답)$/i.test(sp.name));
+    interviewee = interviewee || [...list].filter(sp => !isHost(sp)).sort((x, y) => y.words - x.words)[0] || [...list].sort((x, y) => y.words - x.words)[0];
+    return { speakers: list, interviewee: interviewee ? interviewee.name : null, guestName, firstLine };
+  }
+
+  function linesFor(parsed, name) {
+    const sp = parsed.speakers.find(x => x.name === name);
+    if (!sp) return [];
+    const { text } = applyCorrections(tidy(sp.chunks.join(" ")));
+    return splitSentences(text).filter(x => x.split(" ").length >= 3);   // drop "Yeah." / "Both." style replies
   }
 
   function splitSentences(text) {
@@ -708,14 +766,18 @@ textarea {
     return (state.useAlt && state.useAlt[k] && state.alt && state.alt[k]) || state.lines[i] || "";
   }
   const keyOf = (i) => (state.isSample ? "s" : "l") + i + ":" + (state.lines[i] || "").slice(0, 24);
-  function save() { store.set("jay.state", state); }
+  function save() {
+    if (!state.isSample) library.items[state.id] = state;
+    library.current = state.isSample ? null : state.id;
+    if (!store.set("shadow.library", library)) $("loadMsg").textContent = "기기 저장 공간이 부족해서 저장하지 못했어요. 안 쓰는 인터뷰를 삭제해 주세요.";
+  }
 
   function renderSentence() {
     const s = currentText();
     const usingAlt = s !== (state.lines[state.idx] || "");
     $("altFlag").hidden = !usingAlt;
     renderGrammar();
-    $("speakerName").textContent = state.isSample ? state.speaker + " (예시 문장)" : state.speaker;
+    renderSpeakerPick();
     $("counter").textContent = `${state.idx + 1} / ${state.lines.length}`;
     $("sentence").innerHTML = s.split(/(\s+)/).map(p => /\S/.test(p) ? `<span class="w" tabindex="0" role="button">${esc(p)}</span>` : p).join("");
     const fx = (state.fixes && state.fixes[state.idx]) || [];
@@ -885,48 +947,97 @@ textarea {
     else if (e.key.toLowerCase() === "r" && SR) $("recBtn").click();
   });
 
-  $("fileInput").onchange = async (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    const text = await f.text();
-    e.target.value = "";
-    if (loadLesson(text)) return;
-    $("scriptInput").value = text;
-    $("loadBtn").click();
-  };
-  // Lesson file: {speaker, lines: [...], fixes: [[[from, to], ...], ...]} with already-corrected sentences.
-  function loadLesson(text) {
-    let data;
-    try { data = JSON.parse(text); } catch { return false; }
-    if (!data || !Array.isArray(data.lines) || !data.lines.every(l => typeof l === "string")) return false;
-    const fixes = Array.isArray(data.fixes) && data.fixes.length === data.lines.length ? data.fixes : data.lines.map(() => []);
-    state = { speaker: String(data.speaker || "Jay"), lines: data.lines, fixes, isSample: false, idx: 0, scores: {} };
-    save();
-    $("speakerInput").value = state.speaker;
-    const n = fixes.filter(f => f.length).length;
-    $("loadMsg").textContent = `${state.speaker}의 문장 ${data.lines.length}개를 불러왔어요.` + (n ? ` 그중 ${n}개는 문법을 고친 문장이에요.` : "");
-    renderSentence(); renderList(); renderStats();
-    return true;
+  function addInterview(raw, filename) {
+    const parsed = parseScript(raw);
+    if (!parsed.speakers.length) return { error: "대사 앞에 “이름:”이 붙은 줄을 찾지 못했어요. 예: “Sarah: I'm a designer.”" };
+    const speaker = parsed.interviewee;
+    const lines = linesFor(parsed, speaker);
+    if (!lines.length) return { error: `“${speaker}”의 대사에서 연습할 문장을 찾지 못했어요.` };
+    const title = (filename ? filename.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim() : "") || parsed.firstLine || (speaker + " 인터뷰");
+    const item = {
+      id: "i" + Date.now() + Math.random().toString(36).slice(2, 6), title, raw, added: Date.now(),
+      speaker, speakers: parsed.speakers.map(sp => ({ name: sp.name, words: sp.words })),
+      lines, idx: 0, scores: {}, isSample: false
+    };
+    state = item; save();
+    return { item };
   }
 
-  $("loadBtn").onclick = () => {
-    if (loadLesson($("scriptInput").value)) return;
-    const raw = $("scriptInput").value;
-    const name = $("speakerInput").value.trim() || "Jay";
-    if (!raw.trim()) { $("loadMsg").textContent = "스크립트를 먼저 붙여넣어 주세요."; return; }
-    const { found, sentences, fixes, fixCount } = extractSpeaker(raw, name);
-    if (!found) {
-      $("loadMsg").textContent = "화자 이름(예: “Jay:”)이 붙은 줄을 찾지 못했어요. 각 대사 앞에 “이름:” 형식이 있는지 확인해 주세요.";
-      return;
+  function showLoaded(results) {
+    const ok = results.filter(r => r.item), bad = results.filter(r => r.error);
+    const msg = ok.map(r => `“${r.item.title}”: ${r.item.speaker}의 문장 ${r.item.lines.length}개`).join(" / ");
+    $("loadMsg").textContent = (ok.length ? msg + "를 추가했어요." + (ok[ok.length - 1].item.speakers.length > 1 ? " 다른 사람으로 연습하려면 문장 위의 이름을 바꾸세요." : "") : "")
+      + (bad.length ? " " + bad.map(r => (r.name ? r.name + ": " : "") + r.error).join(" ") : "");
+    renderAll();
+  }
+
+  $("fileInput").onchange = async (e) => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    const results = [];
+    for (const f of files) {
+      const r = addInterview(await f.text(), f.name);
+      r.name = f.name; results.push(r);
     }
-    if (!sentences.length) { $("loadMsg").textContent = `“${name}”의 대사를 찾지 못했어요. 화자 이름 철자를 확인해 주세요.`; return; }
-    state = { speaker: name, lines: sentences, fixes, isSample: false, idx: 0, scores: {} };
-    save();
-    $("loadMsg").textContent = `${name}의 대사에서 ${sentences.length}개 문장을 뽑았어요.` + (fixCount ? ` 비문 ${fixCount}곳을 자연스럽게 고쳤어요.` : "");
-    renderSentence(); renderList(); renderStats();
+    showLoaded(results);
   };
 
-  $("speakerInput").value = state.speaker;
-  renderSentence(); renderList(); renderStats();
+  $("loadBtn").onclick = () => {
+    const raw = $("scriptInput").value;
+    if (!raw.trim()) { $("loadMsg").textContent = "대본을 먼저 붙여넣어 주세요."; return; }
+    const r = addInterview(raw, "");
+    if (r.item) $("scriptInput").value = "";
+    showLoaded([r]);
+  };
+
+  function renderSpeakerPick() {
+    const list = state.speakers || [];
+    $("speakerName").textContent = state.isSample ? "예시 문장" : state.speaker;
+    $("speakerName").hidden = list.length > 1 && !!state.raw;
+    $("speakerPick").hidden = !(list.length > 1 && state.raw);
+    if (!$("speakerPick").hidden) {
+      $("speakerSel").innerHTML = list.map(sp => `<option value="${esc(sp.name)}"${sp.name === state.speaker ? " selected" : ""}>${esc(sp.name)} · ${sp.words}단어</option>`).join("");
+    }
+  }
+
+  $("speakerSel").onchange = () => {
+    const name = $("speakerSel").value;
+    const lines = linesFor(parseScript(state.raw), name);
+    if (!lines.length) { $("loadMsg").textContent = `“${name}”의 대사에는 연습할 만한 문장이 없어요.`; renderSpeakerPick(); return; }
+    state.speaker = name; state.lines = lines; state.idx = 0;
+    state.alt = {}; state.useAlt = {};
+    save(); renderAll();
+  };
+
+  let pendingDelete = null;
+  function renderLibrary() {
+    const items = Object.values(library.items).sort((a, b) => (b.added || 0) - (a.added || 0));
+    $("libNote").textContent = items.length ? `${items.length}개` : "";
+    if (!items.length) { $("lib").innerHTML = `<li class="note">아직 추가한 인터뷰가 없어요. 위에서 대본 파일을 열어 주세요.</li>`; return; }
+    $("lib").innerHTML = items.map(it => {
+      const done = it.lines.filter((l, i) => it.scores[(it.isSample ? "s" : "l") + i + ":" + l.slice(0, 24)] != null).length;
+      return `<li><button class="open" type="button" data-id="${esc(it.id)}" aria-current="${it.id === state.id}"><b>${esc(it.title)}</b><span>${esc(it.speaker)} · ${it.lines.length}문장 · ${done}개 연습</span></button>`
+        + `<button class="del${pendingDelete === it.id ? " confirm" : ""}" type="button" data-del="${esc(it.id)}" aria-label="${esc(it.title)} 삭제">${pendingDelete === it.id ? "삭제 확인" : "삭제"}</button></li>`;
+    }).join("");
+  }
+  $("lib").onclick = (e) => {
+    const open = e.target.closest("[data-id]"), del = e.target.closest("[data-del]");
+    if (open) {
+      if (session) { session.finalText = ""; session.interim = ""; finish(session); }
+      pendingDelete = null; state = library.items[open.dataset.id]; save(); renderAll();
+    } else if (del) {
+      const id = del.dataset.del;
+      if (pendingDelete !== id) { pendingDelete = id; renderLibrary(); return; }
+      pendingDelete = null;
+      delete library.items[id];
+      if (state.id === id) state = Object.values(library.items).sort((a, b) => (b.added || 0) - (a.added || 0))[0] || SAMPLE_STATE();
+      save(); renderAll();
+    }
+  };
+
+  function renderAll() { renderSentence(); renderList(); renderStats(); renderLibrary(); }
+
+  renderAll();
 })();
 </script>
 </body>
