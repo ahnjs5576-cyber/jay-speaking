@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jay 따라 말하기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one practice column — sentence card on top, waveform-style feedback below, script drawer on the side (stacks on phone) */
+:root {
+  --bg: #f3f5f2;
+  --surface: #ffffff;
+  --fg: #1c2421;
+  --muted: #5d6b65;
+  --line: #d9e0dc;
+  --accent: #1f6f5c;
+  --accent-soft: #dcefe8;
+  --good: #1f7a46;
+  --good-soft: #def3e5;
+  --warn: #a8640b;
+  --warn-soft: #fbeed6;
+  --bad: #b3362b;
+  --bad-soft: #f9e0dd;
+  --rec: #d23c2f;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111715; --surface: #18201d; --fg: #e5ece8; --muted: #93a39c; --line: #2a3531;
+    --accent: #5cc4a7; --accent-soft: #1d3a32; --good: #5fcf8c; --good-soft: #1a3324;
+    --warn: #e7a94b; --warn-soft: #3a2c15; --bad: #f0806f; --bad-soft: #3d1f1b; --rec: #ff6a5c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111715; --surface: #18201d; --fg: #e5ece8; --muted: #93a39c; --line: #2a3531;
+  --accent: #5cc4a7; --accent-soft: #1d3a32; --good: #5fcf8c; --good-soft: #1a3324;
+  --warn: #e7a94b; --warn-soft: #3a2c15; --bad: #f0806f; --bad-soft: #3d1f1b; --rec: #ff6a5c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.9rem; margin: 0; letter-spacing: -0.01em; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); margin: 0; font-size: 0.9rem; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-width: 0; }
+.label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* sentence card */
+.card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.counter { font-family: var(--mono); font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.speaker { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--accent); }
+.speaker::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.sentence {
+  font-family: var(--display); font-weight: 500; font-size: clamp(1.4rem, 3.2vw, 2rem); line-height: 1.35;
+  margin: 18px 0 8px; text-wrap: balance; overflow-wrap: anywhere;
+}
+.sentence .w { cursor: pointer; border-radius: 4px; padding: 0 2px; transition: background .15s; }
+.sentence .w:hover { background: var(--accent-soft); }
+.hint { color: var(--muted); font-size: 0.82rem; margin: 0 0 16px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button, select { font: inherit; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px;
+  padding: 9px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-weight: 500;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible, select:focus-visible, textarea:focus-visible, .w:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.btn.rec { background: var(--rec); border-color: var(--rec); color: #fff; }
+.btn.rec.on { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rec) 50%, transparent); } 50% { box-shadow: 0 0 0 8px transparent; } }
+@media (prefers-reduced-motion: reduce) { .btn.rec.on { animation: none; } }
+.speed { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.85rem; }
+select { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); padding: 6px 8px; }
+.nav { margin-left: auto; display: flex; gap: 8px; }
+
+/* result */
+.result { margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 18px; display: grid; gap: 14px; }
+.score-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.score { font-family: var(--display); font-size: 2.6rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.score small { font-size: 1rem; color: var(--muted); font-weight: 500; }
+.pill { font-size: 0.8rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.meter { flex: 1 1 160px; height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; min-width: 120px; }
+.meter i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s; }
+.diff { font-size: 1.1rem; line-height: 2; overflow-wrap: anywhere; }
+.tok { padding: 2px 6px; border-radius: 6px; margin-right: 4px; display: inline-block; line-height: 1.5; }
+.tok.ok { background: var(--good-soft); color: var(--good); }
+.tok.sub { background: var(--warn-soft); color: var(--warn); }
+.tok.sub s { opacity: .7; font-size: .85em; margin-left: 4px; }
+.tok.miss { background: var(--bad-soft); color: var(--bad); text-decoration: underline wavy; text-underline-offset: 4px; }
+.tok.extra { color: var(--muted); font-style: italic; border: 1px dashed var(--line); }
+.heard { font-family: var(--mono); font-size: 0.88rem; color: var(--muted); overflow-wrap: anywhere; }
+.tips { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tips li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; }
+.tips b { color: var(--accent); }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+.live { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); min-height: 1.5em; }
+
+/* script side */
+.side { display: grid; gap: 14px; }
+textarea {
+  width: 100%; min-height: 150px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--bg); color: var(--fg); padding: 10px; font: 0.85rem/1.5 var(--mono);
+}
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row input[type=text] { flex: 1 1 100px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: var(--bg); color: var(--fg); font: inherit; }
+.list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; display: grid; gap: 2px; }
+.list li button {
+  width: 100%; text-align: left; border: 0; background: transparent; color: var(--fg); padding: 7px 8px; border-radius: 8px;
+  cursor: pointer; display: grid; grid-template-columns: 2.2em minmax(0,1fr) auto; gap: 6px; font-size: 0.85rem; align-items: baseline;
+}
+.list li button:hover { background: var(--bg); }
+.list li button[aria-current="true"] { background: var(--accent-soft); }
+.list .n { font-family: var(--mono); color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.list .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list .s { font-family: var(--mono); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.note { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.fixbox { margin: 0 0 12px; font-size: 0.88rem; }
+.fixbox summary { cursor: pointer; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fixbox ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.fixbox li { display: grid; gap: 2px; padding: 8px 12px; border-left: 3px solid var(--warn); background: var(--bg); border-radius: 0 8px 8px 0; overflow-wrap: anywhere; }
+.fixbox del { color: var(--bad); text-decoration-thickness: 1px; }
+.fixbox ins { color: var(--good); text-decoration: none; }
+.fixbox ins::before { content: "→ "; color: var(--muted); }
+.banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; }
+.stats { display: flex; gap: 18px; flex-wrap: wrap; }
+.stats div { display: grid; }
+.stats b { font-family: var(--display); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 0.75rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Jay <span>따라 말하기</span></h1>
+      <p class="sub">문장을 듣고, 따라 말하면 단어별로 발음을 체크해요.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="banner" id="support" hidden></div>
+
+  <div class="grid">
+    <main class="panel" id="practice">
+      <div class="card-top">
+        <span class="speaker" id="speakerName">Jay</span>
+        <span class="counter" id="counter">1 / 1</span>
+      </div>
+      <div class="sentence" id="sentence" lang="en"></div>
+      <details class="fixbox" id="fixbox" hidden>
+        <summary><span class="pill warn">문법 교정됨</span> 원래 말한 표현 보기</summary>
+        <ul id="fixList"></ul>
+      </details>
+      <p class="hint">단어를 누르면 그 단어만 천천히 들려줘요.</p>
+
+      <div class="controls">
+        <button class="btn primary" id="listenBtn" type="button">▶ 원어민 듣기</button>
+        <button class="btn rec" id="recBtn" type="button">● 따라 말하기</button>
+        <button class="btn" id="playMineBtn" type="button" disabled>내 목소리 듣기</button>
+        <label class="speed" for="rate">속도
+          <select id="rate">
+            <option value="0.6">0.6×</option>
+            <option value="0.8">0.8×</option>
+            <option value="1" selected>1.0×</option>
+            <option value="1.15">1.15×</option>
+          </select>
+        </label>
+        <label class="speed" for="voiceSel">목소리
+          <select id="voiceSel" style="max-width:180px"><option>기본</option></select>
+        </label>
+        <div class="nav">
+          <button class="btn" id="prevBtn" type="button" aria-label="이전 문장">←</button>
+          <button class="btn" id="nextBtn" type="button" aria-label="다음 문장">→</button>
+        </div>
+      </div>
+      <div class="live" id="live" aria-live="polite"></div>
+
+      <section class="result" id="result" hidden>
+        <div class="score-row">
+          <div class="score" id="score">0<small>/100</small></div>
+          <span class="pill" id="grade"></span>
+          <div class="meter"><i id="meter"></i></div>
+        </div>
+        <div>
+          <div class="label">단어별 결과</div>
+          <div class="diff" id="diff" lang="en"></div>
+          <div class="legend">
+            <span><span class="tok ok">정확</span></span>
+            <span><span class="tok sub">다르게 들림</span></span>
+            <span><span class="tok miss">빠짐</span></span>
+            <span><span class="tok extra">추가됨</span></span>
+          </div>
+        </div>
+        <div>
+          <div class="label">인식된 문장</div>
+          <div class="heard" id="heard" lang="en"></div>
+        </div>
+        <div>
+          <div class="label">발음 교정 팁</div>
+          <ul class="tips" id="tips"></ul>
+        </div>
+      </section>
+    </main>
+
+    <aside class="side">
+      <section class="panel" style="display:grid;gap:10px">
+        <div class="label">스크립트 불러오기</div>
+        <p class="note"><b>lesson.json</b>(교정된 Jay 문장) 또는 대본 .txt 파일을 열거나, 대본을 붙여넣으세요. 화자 이름이 붙은 줄에서 선택한 사람의 대사만 뽑아요.</p>
+        <textarea id="scriptInput" placeholder="Jay: Hey, how's it going?&#10;Sarah: Pretty good!&#10;Jay: Nice. Let's get started."></textarea>
+        <div class="row">
+          <label class="note" for="speakerInput">화자</label>
+          <input type="text" id="speakerInput" value="Jay">
+        </div>
+        <div class="row">
+          <button class="btn primary" id="loadBtn" type="button">대사 추출</button>
+          <label class="btn" for="fileInput">파일 열기</label>
+          <input type="file" id="fileInput" accept=".json,.txt,.srt,.vtt,application/json,text/plain" hidden>
+        </div>
+        <p class="note" id="loadMsg"></p>
+      </section>
+
+      <section class="panel" style="display:grid;gap:10px">
+        <div class="row" style="justify-content:space-between">
+          <div class="label">문장 목록</div>
+          <span class="note" id="listNote"></span>
+        </div>
+        <ul class="list" id="list"></ul>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  };
+
+  // Example lines shown until a real script is loaded (written for this app, not from the video).
+  const SAMPLE = [
+    "Hey everyone, welcome back to the channel.",
+    "Today I want to talk about something really important.",
+    "I think the key is to practice a little bit every day.",
+    "It doesn't have to be perfect, just keep going.",
+    "Let me know what you think in the comments below."
+  ];
+
+  let state = store.get("jay.state", null) || { speaker: "Jay", lines: SAMPLE, isSample: true, idx: 0, scores: {} };
+
+  /* ---------- script parsing ---------- */
+  function cleanText(raw) {
+    return raw
+      .replace(/^﻿/, "")
+      .replace(/^WEBVTT.*$/m, "")
+      .replace(/^\d+\s*$/gm, "")                                   // srt indexes
+      .replace(/^\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?(?:\s*-->\s*[\d:.,]+)?\s*$/gm, "") // timestamps on their own line
+      .replace(/^\s*\d{1,2}:\d{2}(?::\d{2})?\s+/gm, "")              // leading timestamps
+      .replace(/\[(?:music|applause|laughter|음악|박수)[^\]]*\]/gi, "")
+      .replace(/<[^>]+>/g, "");
+  }
+
+  // Script-specific grammar fixes ship inside lesson files; pasted scripts only get generic cleanup.
+  const CORRECTIONS = [];
+
+  function normalizeQuotes(s) { return s.replace(/[’‘]/g, "'").replace(/[“”]/g, '"'); }
+
+  // Spoken fillers and caption artifacts, applied to any script.
+  function tidy(s) {
+    return s
+      .replace(/\[([a-z ]+)\]/gi, "$1")          // caption editor insertions: [work] -> work
+      .replace(/\b(?:Uh|Um|Uhm),?\s+/g, "")
+      .replace(/\s+/g, " ").trim();
+  }
+
+  function applyCorrections(text) {
+    const used = [];
+    for (const [from, to] of CORRECTIONS) {
+      if (text.includes(from)) { text = text.split(from).join(to); used.push([from, to]); }
+    }
+    text = text.replace(/\s*…\s*/g, ", ").replace(/,\s*,/g, ",").replace(/(^|[.!?]\s+)([a-z])/g, (m, p, c) => p + c.toUpperCase());
+    return { text, used };
+  }
+
+  function extractSpeaker(raw, name) {
+    const text = normalizeQuotes(cleanText(raw));
+    const nameRe = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Speaker label: "Jay:", "JAY -", "[Jay]", ">> Jay:"
+    const labelRe = /^\s*(?:>>\s*)?\[?([A-Za-z][A-Za-z .'-]{0,30}?)\]?\s*[:：\-–—]\s+(.*)$/;
+    const onlyName = /^\s*(?:>>\s*)?\[?([A-Za-z][A-Za-z .'-]{0,30}?)\]?\s*[:：]?\s*$/;
+    const target = new RegExp("^" + nameRe + "$", "i");
+    let current = null, found = false;
+    const chunks = [];
+    for (const lineRaw of text.split(/\r?\n/)) {
+      const line = lineRaw.trim();
+      if (!line) continue;
+      let m = line.match(labelRe);
+      if (m && m[1].split(" ").length <= 3) {
+        current = m[1].trim(); found = true;
+        if (target.test(current)) chunks.push(m[2]);
+        continue;
+      }
+      m = line.match(onlyName);
+      if (m && /[:：]$/.test(line) || (m && line.length < 25 && /^[A-Z]/.test(line) && line === line.toUpperCase())) {
+        current = m[1].trim(); found = true; continue;
+      }
+      if (current && target.test(current)) chunks.push(line);
+    }
+    const spoken = tidy(chunks.join(" "));
+    const { text: fixedText, used } = applyCorrections(spoken);
+    const spokenSet = new Set(splitSentences(spoken));
+    const sentences = [], fixes = [];
+    for (const s of splitSentences(fixedText)) {
+      if (s.split(" ").length < 3) continue;          // drop "Yeah." / "Both." style replies
+      sentences.push(s);
+      fixes.push(spokenSet.has(s) ? [] : used.filter(([, to]) => s.includes(to) || to.includes(s)));
+    }
+    return { found, sentences, fixes, fixCount: used.length };
+  }
+
+  function splitSentences(text) {
+    const t = text.replace(/\s+/g, " ").trim();
+    if (!t) return [];
+    const parts = t.match(/[^.!?]+(?:[.!?]+["')\]]?|$)/g) || [t];
+    const out = [];
+    for (let p of parts) {
+      p = p.trim();
+      if (!p) continue;
+      const words = p.split(" ");
+      if (words.length > 22) {               // break very long run-ons at commas
+        let buf = [];
+        for (const w of words) {
+          buf.push(w);
+          if (buf.length >= 10 && /[,;]$/.test(w)) { out.push(buf.join(" ")); buf = []; }
+        }
+        if (buf.length) out.push(buf.join(" "));
+      } else if (words.length >= 2 || out.length === 0) {
+        out.push(p);
+      } else {
+        out[out.length - 1] += " " + p;      // glue one-word fragments to previous
+      }
+    }
+    return out;
+  }
+
+  /* ---------- text comparison ---------- */
+  const NUM = { "0":"zero","1":"one","2":"two","3":"three","4":"four","5":"five","6":"six","7":"seven","8":"eight","9":"nine","10":"ten","11":"eleven","12":"twelve","20":"twenty","100":"hundred" };
+  const CONTR = { "im":"i am","youre":"you are","its":"it is","dont":"do not","doesnt":"does not","didnt":"did not","cant":"can not","cannot":"can not","wont":"will not","isnt":"is not","arent":"are not","thats":"that is","theres":"there is","whats":"what is","lets":"let us","ive":"i have","id":"i would","ill":"i will","weve":"we have","were":"we are","theyre":"they are","youve":"you have","youll":"you will","gonna":"going to","wanna":"want to","gotta":"got to","ok":"okay" };
+  const norm = (w) => w.toLowerCase().replace(/[’‘`]/g, "'").replace(/[^a-z0-9']/g, "").replace(/'/g, "");
+  function canonical(words) {
+    const out = [];
+    for (const w of words) {
+      const n = norm(w);
+      if (!n) continue;
+      const c = CONTR[n] || NUM[n] || n;
+      out.push(c.split(" ").join(" "));
+    }
+    return out;
+  }
+  // compare by canonical key but keep original surface words
+  function tokens(text) {
+    return text.split(/\s+/).filter(w => norm(w)).map(w => ({ surf: w.replace(/^[^A-Za-z0-9']+|[^A-Za-z0-9'!?.,]+$/g, ""), key: canonical([w])[0] }));
+  }
+
+  function lev(a, b) {
+    const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[n];
+  }
+  const sim = (a, b) => 1 - lev(a, b) / Math.max(a.length, b.length, 1);
+
+  // Needleman–Wunsch style alignment of expected vs heard
+  function align(exp, got) {
+    const m = exp.length, n = got.length, G = -0.6;
+    const S = (i, j) => { const s = sim(exp[i].key, got[j].key); return s === 1 ? 2 : s >= 0.5 ? s : -1; };
+    const D = Array.from({ length: m + 1 }, () => new Float64Array(n + 1));
+    const P = Array.from({ length: m + 1 }, () => new Uint8Array(n + 1));
+    for (let i = 1; i <= m; i++) { D[i][0] = i * G; P[i][0] = 1; }
+    for (let j = 1; j <= n; j++) { D[0][j] = j * G; P[0][j] = 2; }
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+      const d = D[i - 1][j - 1] + S(i - 1, j - 1), u = D[i - 1][j] + G, l = D[i][j - 1] + G;
+      if (d >= u && d >= l) { D[i][j] = d; P[i][j] = 0; } else if (u >= l) { D[i][j] = u; P[i][j] = 1; } else { D[i][j] = l; P[i][j] = 2; }
+    }
+    const ops = []; let i = m, j = n;
+    while (i > 0 || j > 0) {
+      const p = i > 0 && j > 0 ? P[i][j] : (i > 0 ? 1 : 2);
+      if (p === 0) { const e = exp[i - 1], g = got[j - 1]; ops.push({ t: e.key === g.key ? "ok" : (sim(e.key, g.key) >= 0.5 ? "sub" : "miss_extra"), e, g }); i--; j--; }
+      else if (p === 1) { ops.push({ t: "miss", e: exp[i - 1] }); i--; }
+      else { ops.push({ t: "extra", g: got[j - 1] }); j--; }
+    }
+    ops.reverse();
+    const res = [];
+    for (const o of ops) {
+      if (o.t === "miss_extra") { res.push({ t: "sub", e: o.e, g: o.g }); }
+      else res.push(o);
+    }
+    return res;
+  }
+
+  /* ---------- pronunciation tips (common Korean-speaker patterns) ---------- */
+  const RULES = [
+    { test: (e, g) => /r/.test(e) && /l/.test(g) && e.replace(/r/g, "l") === g.replace(/r/g, "l"), tip: (e) => `<b>R 발음</b> — “${e}”의 R이 L처럼 들렸어요. 혀끝을 입천장에 대지 말고, 혀를 살짝 뒤로 말아 입술을 둥글게 하세요.` },
+    { test: (e, g) => /l/.test(e) && /r/.test(g) && e.replace(/l/g, "r") === g.replace(/l/g, "r"), tip: (e) => `<b>L 발음</b> — “${e}”의 L이 R처럼 들렸어요. 혀끝을 윗니 뒤 잇몸에 확실히 붙였다 떼세요.` },
+    { test: (e, g) => /f/.test(e) && /p/.test(g), tip: (e) => `<b>F 발음</b> — “${e}”의 F가 P처럼 들렸어요. 윗니를 아랫입술에 살짝 대고 바람을 내보내세요 (ㅍ 아님).` },
+    { test: (e, g) => /v/.test(e) && /b/.test(g), tip: (e) => `<b>V 발음</b> — “${e}”의 V가 B처럼 들렸어요. F와 같은 입 모양에 성대를 울리세요.` },
+    { test: (e, g) => /th/.test(e) && /(^|[^t])[sdzt]/.test(g) && !/th/.test(g), tip: (e) => `<b>TH 발음</b> — “${e}”의 TH가 S/D처럼 들렸어요. 혀끝을 윗니와 아랫니 사이에 살짝 내밀고 바람을 내세요.` },
+    { test: (e, g) => /z/.test(e) && /j/.test(g), tip: (e) => `<b>Z 발음</b> — “${e}”의 Z가 ㅈ처럼 들렸어요. S 소리를 내면서 성대를 울리는 ‘즈~’ 진동 소리예요.` },
+    { test: (e, g) => g.length >= 3 && e.startsWith(g) && e.length - g.length <= 3 && /(s|ed|d|t)$/.test(e), tip: (e) => `<b>끝소리</b> — “${e}”의 마지막 자음(-s, -ed, -t 등)이 안 들렸어요. 단어 끝까지 또렷하게 마무리하세요.` },
+    { test: (e, g) => e.length >= 3 && g.startsWith(e) && /(u|eu|e|i)$/.test(g.slice(e.length)), tip: (e) => `<b>모음 붙이지 않기</b> — “${e}” 끝에 ‘으’ 같은 모음이 붙었을 수 있어요. 자음으로 끝내세요.` },
+    { test: (e, g) => /^(i|ee|ea)/.test(e) !== /^(i|ee|ea)/.test(g) && /(ee|ea)/.test(e + g), tip: (e, g) => `<b>장모음/단모음</b> — “${e}”와 “${g}”를 구분해 보세요. ee/ea는 길게 ‘이—’, i는 짧고 힘 빼서 ‘이’.` }
+  ];
+  const FUNC = new Set(["a","an","the","to","of","and","in","on","at","for","is","it","that","i","you","so","but","or","as","be","do"]);
+
+  function buildTips(ops, confidence) {
+    const tips = []; const seen = new Set();
+    for (const o of ops) {
+      if (o.t === "sub") {
+        const e = o.e.key, g = o.g.key;
+        const rule = RULES.find(r => r.test(e, g));
+        const msg = rule ? rule.tip(o.e.surf, o.g.surf) : `<b>${esc(o.e.surf)}</b> — “${esc(o.g.surf)}”(으)로 인식됐어요. 단어를 눌러 원어민 발음을 들어보고 강세 위치에 주의해서 다시 말해 보세요.`;
+        if (!seen.has(msg)) { seen.add(msg); tips.push(msg); }
+      }
+    }
+    const missed = ops.filter(o => o.t === "miss");
+    const missedFunc = missed.filter(o => FUNC.has(o.e.key));
+    const missedContent = missed.filter(o => !FUNC.has(o.e.key));
+    if (missedContent.length) tips.push(`<b>빠진 단어</b> — ${missedContent.map(o => "“" + esc(o.e.surf) + "”").join(", ")}가 인식되지 않았어요. 천천히 듣고 이 부분에 힘을 줘서 말해 보세요.`);
+    if (missedFunc.length) tips.push(`<b>기능어 연음</b> — ${missedFunc.map(o => "“" + esc(o.e.surf) + "”").join(", ")}처럼 짧은 단어는 약하게 말해도 되지만, 아예 빼면 안 돼요. 앞 단어에 붙여서(연음) 짧게 넣어 주세요.`);
+    if (typeof confidence === "number" && confidence > 0 && confidence < 0.7 && !tips.length) tips.push(`<b>또렷함</b> — 단어는 다 맞았지만 인식 확신도가 ${Math.round(confidence * 100)}%로 낮아요. 입을 조금 더 크게 벌리고 강세 있는 음절을 길고 크게 말해 보세요.`);
+    if (!tips.length) tips.push(`<b>좋아요!</b> 이번엔 속도를 1.15×로 올려 원어민 리듬에 맞춰 보거나, 듣지 않고 바로 말해 보세요.`);
+    return tips;
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  /* ---------- speech ---------- */
+  const MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  const IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  const INAPP = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|wv\)/i.test(navigator.userAgent);
+  const TTS = "speechSynthesis" in window;
+  let voices = [], voice = null, badVoices = new Set(), currentUtter = null, speakTimer = null;
+  function pickVoice() {
+    voices = speechSynthesis.getVoices().filter(v => /^en(-|_)?/i.test(v.lang) && !badVoices.has(v.name));
+    // Prefer voices installed on the device: Chrome's network "Google" voices often fail silently.
+    const local = voices.filter(v => v.localService);
+    const pool = local.length ? local : voices;
+    voice = pool.find(v => /en-US/i.test(v.lang) && /(Samantha|Aria|Jenny|Natural|Zira|David|Alex)/i.test(v.name))
+      || pool.find(v => /en-US/i.test(v.lang)) || pool[0] || null;
+    const sel = $("voiceSel");
+    if (sel && voices.length) {
+      sel.innerHTML = voices.map(v => `<option value="${esc(v.name)}"${voice && v.name === voice.name ? " selected" : ""}>${esc(v.name)} (${esc(v.lang)})</option>`).join("");
+      const saved = store.get("jay.voice", null);
+      if (saved && voices.some(v => v.name === saved)) { sel.value = saved; voice = voices.find(v => v.name === saved); }
+    }
+  }
+  if (TTS) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; setTimeout(pickVoice, 600); }
+
+  function ttsStatus(msg) { $("live").textContent = msg; }
+
+  function speak(text, rate, retried) {
+    if (!TTS) { ttsStatus("이 브라우저는 읽어주기 기능을 지원하지 않아요. 크롬이나 엣지에서 열어 주세요."); return; }
+    if (!voices.length) pickVoice();
+    clearTimeout(speakTimer);
+    // Chrome drops an utterance queued right after cancel(), so wait a moment when something is playing.
+    const busy = speechSynthesis.speaking || speechSynthesis.pending;
+    if (busy) speechSynthesis.cancel();
+    const run = () => {
+      speechSynthesis.resume();                       // Chrome can get stuck in a paused state
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "en-US"; if (voice) u.voice = voice;
+      u.rate = rate ?? parseFloat($("rate").value); u.volume = 1;
+      let started = false;
+      u.onstart = () => { started = true; ttsStatus("🔊 읽는 중…"); };
+      u.onend = () => { if ($("live").textContent === "🔊 읽는 중…") ttsStatus(""); };
+      u.onerror = (e) => {
+        if (e.error === "interrupted" || e.error === "canceled") return;
+        if (!retried && voice) { badVoices.add(voice.name); pickVoice(); speak(text, rate, true); return; }
+        ttsStatus("읽어주기에 실패했어요 (" + e.error + "). 목소리 메뉴에서 다른 것으로 바꿔 보세요.");
+      };
+      currentUtter = u;                               // keep a reference so Chrome doesn't garbage-collect it
+      speechSynthesis.speak(u);
+      // No start event after 2.5s: the voice is silently broken, so retry once with another one.
+      setTimeout(() => {
+        if (started || currentUtter !== u) return;
+        if (!retried && voice) { badVoices.add(voice.name); speechSynthesis.cancel(); pickVoice(); speak(text, rate, true); }
+        else ttsStatus("소리가 나지 않으면: 크롬/엣지 브라우저에서 직접 열었는지, 기기 음량과 무음 모드를 확인하고, 목소리 메뉴에서 바꿔 보세요.");
+      }, 2500);
+    };
+    if (busy) speakTimer = setTimeout(run, 150); else run();
+  }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recording = false, mediaRec = null, chunks = [], myAudioUrl = null, stream = null;
+
+  if (!SR) {
+    $("support").hidden = false;
+    $("support").textContent = "이 브라우저는 음성 인식을 지원하지 않아요. 크롬(Chrome) 또는 엣지(Edge)에서 열어 주세요. 듣기 기능은 그대로 쓸 수 있어요.";
+    $("recBtn").disabled = true;
+  } else if (location.protocol === "file:" && !/Chrome/.test(navigator.userAgent)) {
+    $("support").hidden = false;
+    $("support").textContent = "마이크가 안 되면 크롬에서 파일을 열거나, 폴더에서 `python3 -m http.server` 실행 후 http://localhost:8000 으로 접속하세요.";
+  }
+
+  // One practice attempt at a time. `session` is set synchronously on click so a second
+  // click while the mic is still starting becomes "stop", never a second recognizer.
+  let session = null;
+
+  function startRec() {
+    if (session) return;
+    const target = state.lines[state.idx];
+    if (TTS) speechSynthesis.cancel();
+    const s = session = { finalText: "", interim: "", conf: [], done: false, silenceTimer: null, forceTimer: null, rec: new SR() };
+    const r = s.rec;
+    r.lang = "en-US"; r.interimResults = true; r.maxAlternatives = 3; r.continuous = !MOBILE;
+    const resetSilence = () => { clearTimeout(s.silenceTimer); s.silenceTimer = setTimeout(() => stopRec(), 2500); };
+
+    r.onresult = (ev) => {
+      if (s.done) return;
+      let interim = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const res = ev.results[i];
+        if (res.isFinal) {
+          // choose the alternative closest to the target sentence
+          let best = res[0];
+          for (let k = 0; k < res.length; k++) if (sim(norm(res[k].transcript), norm(target)) > sim(norm(best.transcript), norm(target))) best = res[k];
+          s.finalText += " " + best.transcript; if (best.confidence) s.conf.push(best.confidence);
+        } else interim += res[0].transcript;
+      }
+      s.interim = interim;
+      $("live").textContent = (s.finalText + " " + interim).trim();
+      resetSilence();
+    };
+    r.onerror = (ev) => {
+      if (ev.error === "aborted") return;
+      const deny = INAPP ? "카카오톡·인스타그램 같은 앱 안의 브라우저는 마이크를 막아요. 오른쪽 위 메뉴에서 ‘다른 브라우저로 열기’를 눌러 " + (IOS ? "사파리" : "크롬") + "로 열어 주세요."
+        : IOS ? "마이크 또는 음성 인식 권한이 꺼져 있어요. 아이폰 설정 → 앱 → Safari → 마이크를 ‘허용’으로 바꾸고, 설정 → Siri에서 ‘받아쓰기’가 켜져 있는지 확인한 뒤 페이지를 새로고침해 주세요."
+        : MOBILE ? "마이크 권한이 거부됐어요. 크롬 주소창 왼쪽 아이콘 → 권한(사이트 설정) → 마이크 → 허용을 누른 뒤 새로고침해 주세요."
+        : "마이크 권한이 거부됐어요. 주소창의 자물쇠 아이콘에서 마이크를 허용해 주세요.";
+      const map = { "not-allowed": deny, "service-not-allowed": IOS ? "음성 인식을 쓸 수 없어요. 설정 → Siri에서 ‘받아쓰기’를 켜고, 사파리에서 열었는지 확인해 주세요." : deny, "no-speech": "소리가 들리지 않았어요. 마이크 가까이에서 다시 말해 보세요.", "network": "음성 인식 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.", "audio-capture": "마이크를 찾을 수 없어요." };
+      s.error = map[ev.error] || ("음성 인식 오류: " + ev.error);
+      finish(s);
+    };
+    r.onend = () => finish(s);
+
+    setRecUI("on");
+    $("live").textContent = "듣고 있어요… 문장을 말해 주세요.";
+    try { r.start(); } catch (e) { s.error = "음성 인식을 시작하지 못했어요. 페이지를 새로고침해 주세요."; finish(s); return; }
+    resetSilence();
+    if (!MOBILE) startMedia(s);
+  }
+
+  // Stop button / silence: ask the recognizer to wrap up, but never wait more than 1.5s.
+  function stopRec() {
+    const s = session;
+    if (!s || s.done) return;
+    setRecUI("stopping");
+    clearTimeout(s.silenceTimer);
+    try { s.rec.stop(); } catch {}
+    s.forceTimer = setTimeout(() => { try { s.rec.abort(); } catch {} finish(s); }, 1500);
+  }
+
+  function finish(s) {
+    if (s.done) return;
+    s.done = true;
+    clearTimeout(s.silenceTimer); clearTimeout(s.forceTimer);
+    try { s.rec.abort(); } catch {}
+    stopMedia();
+    if (session === s) session = null;
+    setRecUI("off");
+    const heard = (s.finalText + " " + s.interim).trim();   // keep words still being recognized at stop time
+    if (heard) grade(state.lines[state.idx], heard, s.conf.length ? s.conf.reduce((a, b) => a + b, 0) / s.conf.length : undefined);
+    else $("live").textContent = s.error || "인식된 말이 없어요. ‘따라 말하기’를 누르고 다시 말해 보세요.";
+  }
+
+  // Record the learner's own voice for playback; optional, so failures are ignored.
+  async function startMedia(s) {
+    if (!window.MediaRecorder || !navigator.mediaDevices) return;
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (s.done) { st.getTracks().forEach(t => t.stop()); return; }
+      stream = st; chunks = []; mediaRec = new MediaRecorder(st);
+      const mr = mediaRec;
+      mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      mr.onstop = () => {
+        if (myAudioUrl) URL.revokeObjectURL(myAudioUrl);
+        myAudioUrl = URL.createObjectURL(new Blob(chunks, { type: mr.mimeType }));
+        $("playMineBtn").disabled = false;
+      };
+      mr.start();
+    } catch {}
+  }
+  function stopMedia() {
+    if (mediaRec && mediaRec.state !== "inactive") mediaRec.stop();
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  function setRecUI(mode) {
+    recording = mode !== "off";
+    $("recBtn").classList.toggle("on", mode === "on");
+    $("recBtn").textContent = mode === "on" ? "■ 멈추기" : mode === "stopping" ? "채점 중…" : "● 따라 말하기";
+  }
+
+  /* ---------- grading ---------- */
+  function grade(target, heard, confidence) {
+    const exp = tokens(target), got = tokens(heard);
+    const ops = align(exp, got);
+    let pts = 0;
+    for (const o of ops) {
+      if (o.t === "ok") pts += 1;
+      else if (o.t === "sub") pts += Math.max(0, sim(o.e.key, o.g.key) - 0.3);
+    }
+    const extras = ops.filter(o => o.t === "extra").length;
+    let acc = exp.length ? pts / exp.length : 0;
+    acc = Math.max(0, acc - extras * 0.03);
+    const confFactor = typeof confidence === "number" && confidence > 0 ? 0.85 + 0.15 * confidence : 1;
+    const score = Math.round(Math.min(1, acc) * confFactor * 100);
+
+    $("result").hidden = false;
+    $("score").innerHTML = score + "<small>/100</small>";
+    $("meter").style.width = score + "%";
+    const g = $("grade");
+    g.className = "pill " + (score >= 85 ? "good" : score >= 60 ? "warn" : "bad");
+    g.textContent = score >= 85 ? "훌륭해요" : score >= 60 ? "거의 다 왔어요" : "한 번 더";
+    $("diff").innerHTML = ops.map(o => {
+      if (o.t === "ok") return `<span class="tok ok">${esc(o.e.surf)}</span>`;
+      if (o.t === "sub") return `<span class="tok sub">${esc(o.e.surf)}<s>${esc(o.g.surf)}</s></span>`;
+      if (o.t === "miss") return `<span class="tok miss">${esc(o.e.surf)}</span>`;
+      return `<span class="tok extra">+${esc(o.g.surf)}</span>`;
+    }).join("");
+    $("heard").textContent = heard + (confidence ? `  (인식 확신도 ${Math.round(confidence * 100)}%)` : "");
+    $("tips").innerHTML = buildTips(ops, confidence).map(t => `<li>${t}</li>`).join("");
+
+    const key = keyOf(state.idx);
+    state.scores[key] = Math.max(state.scores[key] || 0, score);
+    save(); renderList(); renderStats();
+  }
+
+  /* ---------- rendering ---------- */
+  const keyOf = (i) => (state.isSample ? "s" : "l") + i + ":" + (state.lines[i] || "").slice(0, 24);
+  function save() { store.set("jay.state", state); }
+
+  function renderSentence() {
+    const s = state.lines[state.idx] || "";
+    $("speakerName").textContent = state.isSample ? state.speaker + " (예시 문장)" : state.speaker;
+    $("counter").textContent = `${state.idx + 1} / ${state.lines.length}`;
+    $("sentence").innerHTML = s.split(/(\s+)/).map(p => /\S/.test(p) ? `<span class="w" tabindex="0" role="button">${esc(p)}</span>` : p).join("");
+    const fx = (state.fixes && state.fixes[state.idx]) || [];
+    $("fixbox").hidden = !fx.length;
+    $("fixList").innerHTML = fx.map(([from, to]) => `<li><del lang="en">${esc(from)}</del><ins lang="en">${esc(to)}</ins></li>`).join("");
+    $("result").hidden = true;
+    $("live").textContent = "";
+    $("playMineBtn").disabled = true;
+    $("prevBtn").disabled = state.idx === 0;
+    $("nextBtn").disabled = state.idx >= state.lines.length - 1;
+  }
+
+  function renderList() {
+    $("listNote").textContent = state.isSample ? "예시" : `${state.lines.length}문장`;
+    $("list").innerHTML = state.lines.map((l, i) => {
+      const sc = state.scores[keyOf(i)];
+      const color = sc == null ? "var(--muted)" : sc >= 85 ? "var(--good)" : sc >= 60 ? "var(--warn)" : "var(--bad)";
+      return `<li><button type="button" data-i="${i}" aria-current="${i === state.idx}"><span class="n">${i + 1}</span><span class="t" lang="en">${esc(l)}</span><span class="s" style="color:${color}">${sc == null ? "—" : sc}</span></button></li>`;
+    }).join("");
+    const cur = $("list").querySelector('[aria-current="true"]');
+    if (cur) cur.scrollIntoView({ block: "nearest" });
+  }
+
+  function renderStats() {
+    const vals = state.lines.map((_, i) => state.scores[keyOf(i)]).filter(v => v != null);
+    const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : "—";
+    const mastered = vals.filter(v => v >= 85).length;
+    $("stats").innerHTML = `<div><b>${vals.length}/${state.lines.length}</b><span>연습한 문장</span></div><div><b>${avg}</b><span>평균 점수</span></div><div><b>${mastered}</b><span>85점 이상</span></div>`;
+  }
+
+  function go(i) {
+    if (session) { session.finalText = ""; session.interim = ""; finish(session); }
+    state.idx = Math.max(0, Math.min(state.lines.length - 1, i));
+    save(); renderSentence(); renderList();
+  }
+
+  /* ---------- events ---------- */
+  $("listenBtn").onclick = () => speak(state.lines[state.idx]);
+  $("recBtn").onclick = () => { if (session) stopRec(); else startRec(); };
+  $("playMineBtn").onclick = () => { if (myAudioUrl) new Audio(myAudioUrl).play(); };
+  $("prevBtn").onclick = () => go(state.idx - 1);
+  $("nextBtn").onclick = () => go(state.idx + 1);
+  $("list").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (b) go(+b.dataset.i); };
+  const sayWord = (el) => speak(el.textContent.replace(/[^A-Za-z0-9' -]/g, ""), 0.7);
+  $("sentence").onclick = (e) => { const w = e.target.closest(".w"); if (w) sayWord(w); };
+  $("sentence").onkeydown = (e) => { const w = e.target.closest(".w"); if (w && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); sayWord(w); } };
+  $("rate").value = String(store.get("jay.rate", "1"));
+  $("rate").onchange = () => store.set("jay.rate", $("rate").value);
+  $("voiceSel").onchange = () => {
+    const v = voices.find(v => v.name === $("voiceSel").value);
+    if (v) { voice = v; badVoices.delete(v.name); store.set("jay.voice", v.name); speak("Hello, I'm Jay."); }
+  };
+  if (MOBILE) $("playMineBtn").hidden = true;      // phones: recognition gets the mic to itself
+  if (INAPP) {
+    $("support").hidden = false;
+    $("support").textContent = "앱 안의 브라우저에서는 마이크가 막혀요. 오른쪽 위 메뉴에서 ‘다른 브라우저로 열기’를 눌러 " + (IOS ? "사파리" : "크롬") + "로 열어 주세요.";
+  } else if (window.top !== window) {
+    $("support").hidden = false;
+    $("support").textContent = "미리보기 화면에서는 소리와 마이크가 막힐 수 있어요. 파일을 내려받아 크롬이나 엣지 브라우저에서 직접 열어 주세요.";
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target.matches("textarea, input, select")) return;
+    if (e.key === "ArrowRight") go(state.idx + 1);
+    else if (e.key === "ArrowLeft") go(state.idx - 1);
+    else if (e.key.toLowerCase() === "l") speak(state.lines[state.idx]);
+    else if (e.key.toLowerCase() === "r" && SR) $("recBtn").click();
+  });
+
+  $("fileInput").onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const text = await f.text();
+    e.target.value = "";
+    if (loadLesson(text)) return;
+    $("scriptInput").value = text;
+    $("loadBtn").click();
+  };
+  // Lesson file: {speaker, lines: [...], fixes: [[[from, to], ...], ...]} with already-corrected sentences.
+  function loadLesson(text) {
+    let data;
+    try { data = JSON.parse(text); } catch { return false; }
+    if (!data || !Array.isArray(data.lines) || !data.lines.every(l => typeof l === "string")) return false;
+    const fixes = Array.isArray(data.fixes) && data.fixes.length === data.lines.length ? data.fixes : data.lines.map(() => []);
+    state = { speaker: String(data.speaker || "Jay"), lines: data.lines, fixes, isSample: false, idx: 0, scores: {} };
+    save();
+    $("speakerInput").value = state.speaker;
+    const n = fixes.filter(f => f.length).length;
+    $("loadMsg").textContent = `${state.speaker}의 문장 ${data.lines.length}개를 불러왔어요.` + (n ? ` 그중 ${n}개는 문법을 고친 문장이에요.` : "");
+    renderSentence(); renderList(); renderStats();
+    return true;
+  }
+
+  $("loadBtn").onclick = () => {
+    if (loadLesson($("scriptInput").value)) return;
+    const raw = $("scriptInput").value;
+    const name = $("speakerInput").value.trim() || "Jay";
+    if (!raw.trim()) { $("loadMsg").textContent = "스크립트를 먼저 붙여넣어 주세요."; return; }
+    const { found, sentences, fixes, fixCount } = extractSpeaker(raw, name);
+    if (!found) {
+      $("loadMsg").textContent = "화자 이름(예: “Jay:”)이 붙은 줄을 찾지 못했어요. 각 대사 앞에 “이름:” 형식이 있는지 확인해 주세요.";
+      return;
+    }
+    if (!sentences.length) { $("loadMsg").textContent = `“${name}”의 대사를 찾지 못했어요. 화자 이름 철자를 확인해 주세요.`; return; }
+    state = { speaker: name, lines: sentences, fixes, isSample: false, idx: 0, scores: {} };
+    save();
+    $("loadMsg").textContent = `${name}의 대사에서 ${sentences.length}개 문장을 뽑았어요.` + (fixCount ? ` 비문 ${fixCount}곳을 자연스럽게 고쳤어요.` : "");
+    renderSentence(); renderList(); renderStats();
+  };
+
+  $("speakerInput").value = state.speaker;
+  renderSentence(); renderList(); renderStats();
+})();
+</script>
+</body>
+</html>
