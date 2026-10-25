@@ -143,6 +143,21 @@ textarea {
 .fixbox del { color: var(--bad); text-decoration-thickness: 1px; }
 .fixbox ins { color: var(--good); text-decoration: none; }
 .fixbox ins::before { content: "→ "; color: var(--muted); }
+.gram { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 12px; background: var(--bg); }
+.gram-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gram-status { font-size: 0.85rem; color: var(--muted); }
+.issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.issues li { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 0.88rem; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.issues .cat { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: var(--warn); }
+.issues .chg del { color: var(--bad); }
+.issues .chg ins { color: var(--good); text-decoration: none; font-weight: 600; }
+.issues .chg ins::before { content: " → "; color: var(--muted); font-weight: 400; }
+.issues .msg { color: var(--muted); font-size: 0.82rem; }
+.corrected { font-family: var(--display); font-size: 1.15rem; line-height: 1.5; overflow-wrap: anywhere; }
+.corrected mark { background: var(--good-soft); color: var(--good); border-radius: 4px; padding: 0 2px; }
+.alt-flag { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: 0.85rem; color: var(--muted); }
+.linkbtn { border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+.auto { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
 .banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; }
 .stats { display: flex; gap: 18px; flex-wrap: wrap; }
 .stats div { display: grid; }
@@ -173,12 +188,17 @@ textarea {
         <summary><span class="pill warn">문법 교정됨</span> 원래 말한 표현 보기</summary>
         <ul id="fixList"></ul>
       </details>
+      <div class="alt-flag" id="altFlag" hidden>
+        <span class="pill good">교정한 문장으로 연습 중</span>
+        <button class="linkbtn" id="altOffBtn" type="button">원래 문장으로 돌아가기</button>
+      </div>
       <p class="hint">단어를 누르면 그 단어만 천천히 들려줘요.</p>
 
       <div class="controls">
         <button class="btn primary" id="listenBtn" type="button">▶ 원어민 듣기</button>
         <button class="btn rec" id="recBtn" type="button">● 따라 말하기</button>
         <button class="btn" id="playMineBtn" type="button" disabled>내 목소리 듣기</button>
+        <button class="btn" id="gramBtn" type="button">✓ 문법 체크</button>
         <label class="speed" for="rate">속도
           <select id="rate">
             <option value="0.6">0.6×</option>
@@ -196,6 +216,23 @@ textarea {
         </div>
       </div>
       <div class="live" id="live" aria-live="polite"></div>
+
+      <section class="gram" id="gram" hidden aria-live="polite">
+        <div class="gram-head">
+          <div class="label">문법 체크</div>
+          <label class="auto" for="autoGram"><input type="checkbox" id="autoGram"> 문장을 넘길 때 자동으로 체크</label>
+        </div>
+        <div class="gram-status" id="gramStatus"></div>
+        <ul class="issues" id="issues"></ul>
+        <div id="correctedBox" hidden>
+          <div class="label">고친 문장</div>
+          <div class="corrected" id="corrected" lang="en"></div>
+        </div>
+        <div class="controls" id="gramActions" hidden>
+          <button class="btn primary" id="useAltBtn" type="button">고친 문장으로 연습하기</button>
+          <button class="btn" id="hearAltBtn" type="button">▶ 고친 문장 듣기</button>
+        </div>
+      </section>
 
       <section class="result" id="result" hidden>
         <div class="score-row">
@@ -536,7 +573,7 @@ textarea {
 
   function startRec() {
     if (session) return;
-    const target = state.lines[state.idx];
+    const target = currentText();
     if (TTS) speechSynthesis.cancel();
     const s = session = { finalText: "", interim: "", conf: [], done: false, silenceTimer: null, forceTimer: null, rec: new SR() };
     const r = s.rec;
@@ -597,7 +634,7 @@ textarea {
     if (session === s) session = null;
     setRecUI("off");
     const heard = (s.finalText + " " + s.interim).trim();   // keep words still being recognized at stop time
-    if (heard) grade(state.lines[state.idx], heard, s.conf.length ? s.conf.reduce((a, b) => a + b, 0) / s.conf.length : undefined);
+    if (heard) grade(currentText(), heard, s.conf.length ? s.conf.reduce((a, b) => a + b, 0) / s.conf.length : undefined);
     else $("live").textContent = s.error || "인식된 말이 없어요. ‘따라 말하기’를 누르고 다시 말해 보세요.";
   }
 
@@ -665,11 +702,19 @@ textarea {
   }
 
   /* ---------- rendering ---------- */
+  // The sentence being practiced: the corrected version when the learner switched to it.
+  function currentText(i = state.idx) {
+    const k = keyOf(i);
+    return (state.useAlt && state.useAlt[k] && state.alt && state.alt[k]) || state.lines[i] || "";
+  }
   const keyOf = (i) => (state.isSample ? "s" : "l") + i + ":" + (state.lines[i] || "").slice(0, 24);
   function save() { store.set("jay.state", state); }
 
   function renderSentence() {
-    const s = state.lines[state.idx] || "";
+    const s = currentText();
+    const usingAlt = s !== (state.lines[state.idx] || "");
+    $("altFlag").hidden = !usingAlt;
+    renderGrammar();
     $("speakerName").textContent = state.isSample ? state.speaker + " (예시 문장)" : state.speaker;
     $("counter").textContent = `${state.idx + 1} / ${state.lines.length}`;
     $("sentence").innerHTML = s.split(/(\s+)/).map(p => /\S/.test(p) ? `<span class="w" tabindex="0" role="button">${esc(p)}</span>` : p).join("");
@@ -705,11 +750,110 @@ textarea {
     if (session) { session.finalText = ""; session.interim = ""; finish(session); }
     state.idx = Math.max(0, Math.min(state.lines.length - 1, i));
     save(); renderSentence(); renderList();
+    if ($("autoGram").checked && !gramCache[currentKey()]) checkGrammar();
+  }
+
+
+  /* ---------- grammar check (LanguageTool public API) ---------- */
+  const LT_URL = "https://api.languagetool.org/v2/check";
+  const LT_SKIP_RULES = new Set(["UPPERCASE_SENTENCE_START", "WHITESPACE_RULE", "EN_QUOTES", "DASH_RULE", "PUNCTUATION_PARAGRAPH_END", "COMMA_PARENTHESIS_WHITESPACE"]);
+  const LT_CAT = { GRAMMAR: "문법", TYPOS: "철자", PUNCTUATION: "구두점", CONFUSED_WORDS: "헷갈리는 단어", COLLOCATIONS: "단어 조합", REDUNDANCY: "중복 표현", STYLE: "표현", PLAIN_ENGLISH: "표현", SEMANTICS: "의미", CASING: "대소문자", MISC: "기타" };
+  const gramCache = {};            // sentence key -> {issues, corrected, html} | {error}
+  let gramBusy = false;
+  const currentKey = () => keyOf(state.idx) + "|" + (state.lines[state.idx] || "");
+
+  function usableMatch(m, text) {
+    if (LT_SKIP_RULES.has(m.rule && m.rule.id)) return false;
+    if (m.rule && m.rule.category && m.rule.category.id === "TYPOGRAPHY") return false;
+    const bit = text.substr(m.offset, m.length);
+    // Names and acronyms (OpenAI, Codex, GTM) are flagged as typos; leave them alone.
+    if (m.rule && m.rule.issueType === "misspelling" && /[A-Z]/.test(bit)) return false;
+    return true;
+  }
+
+  function buildCorrection(text, matches) {
+    const issues = [], parts = [], htmlParts = [];
+    let pos = 0;
+    for (const m of [...matches].sort((a, b) => a.offset - b.offset)) {
+      const orig = text.substr(m.offset, m.length);
+      const rep = m.replacements && m.replacements[0] ? m.replacements[0].value : null;
+      issues.push({ orig, rep, msg: m.shortMessage || m.message, detail: m.message, cat: LT_CAT[m.rule && m.rule.category && m.rule.category.id] || "기타" });
+      if (rep == null || m.offset < pos) continue;            // nothing to apply, or overlaps an earlier fix
+      parts.push(text.slice(pos, m.offset), rep);
+      htmlParts.push(esc(text.slice(pos, m.offset)), `<mark>${esc(rep)}</mark>`);
+      pos = m.offset + m.length;
+    }
+    parts.push(text.slice(pos)); htmlParts.push(esc(text.slice(pos)));
+    const corrected = parts.join("").replace(/\s{2,}/g, " ").trim();
+    return { issues, corrected: corrected !== text ? corrected : null, html: htmlParts.join("") };
+  }
+
+  async function checkGrammar() {
+    const key = currentKey(), text = state.lines[state.idx] || "";
+    if (!text || gramBusy) return;
+    if (gramCache[key] && !gramCache[key].error) { renderGrammar(); return; }
+    gramBusy = true;
+    gramCache[key] = { loading: true };
+    renderGrammar();
+    try {
+      const res = await fetch(LT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ text, language: "en-US", level: "picky" })
+      });
+      if (res.status === 429) throw new Error("rate");
+      if (!res.ok) throw new Error("http " + res.status);
+      const data = await res.json();
+      gramCache[key] = buildCorrection(text, (data.matches || []).filter(m => usableMatch(m, text)));
+    } catch (e) {
+      gramCache[key] = { error: e.message === "rate"
+        ? "잠깐 사이에 너무 많이 검사했어요. 1분 뒤에 다시 눌러 주세요."
+        : "문법 검사 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요." };
+    } finally {
+      gramBusy = false;
+      if (key === currentKey()) renderGrammar();
+    }
+  }
+
+  function renderGrammar() {
+    const r = gramCache[currentKey()];
+    $("gram").hidden = !r;
+    if (!r) return;
+    $("issues").innerHTML = ""; $("correctedBox").hidden = true; $("gramActions").hidden = true;
+    if (r.loading) { $("gramStatus").textContent = "검사하는 중…"; return; }
+    if (r.error) { $("gramStatus").textContent = r.error; return; }
+    if (!r.issues.length) { $("gramStatus").textContent = "문법 문제를 찾지 못했어요. 이 문장 그대로 연습하면 돼요."; return; }
+    $("gramStatus").textContent = `고칠 부분 ${r.issues.length}곳을 찾았어요.`;
+    $("issues").innerHTML = r.issues.map(i => `<li><span class="cat">${esc(i.cat)}</span>`
+      + `<span class="chg" lang="en"><del>${esc(i.orig)}</del>${i.rep != null ? `<ins>${esc(i.rep || "(삭제)")}</ins>` : ""}</span>`
+      + `<span class="msg" lang="en">${esc(i.detail)}</span></li>`).join("");
+    if (r.corrected) {
+      $("correctedBox").hidden = false;
+      $("corrected").innerHTML = r.html;
+      $("gramActions").hidden = false;
+      const k = keyOf(state.idx), on = !!(state.useAlt && state.useAlt[k]);
+      $("useAltBtn").textContent = on ? "원래 문장으로 연습하기" : "고친 문장으로 연습하기";
+    }
+  }
+
+  function setUseAlt(on) {
+    const k = keyOf(state.idx), r = gramCache[currentKey()];
+    state.alt = state.alt || {}; state.useAlt = state.useAlt || {};
+    if (on && r && r.corrected) { state.alt[k] = r.corrected; state.useAlt[k] = true; }
+    else delete state.useAlt[k];
+    save(); renderSentence();
   }
 
   /* ---------- events ---------- */
-  $("listenBtn").onclick = () => speak(state.lines[state.idx]);
+  $("listenBtn").onclick = () => speak(currentText());
   $("recBtn").onclick = () => { if (session) stopRec(); else startRec(); };
+  $("gramBtn").onclick = () => checkGrammar();
+  $("useAltBtn").onclick = () => { const k = keyOf(state.idx); setUseAlt(!(state.useAlt && state.useAlt[k])); };
+  $("altOffBtn").onclick = () => setUseAlt(false);
+  $("hearAltBtn").onclick = () => { const r = gramCache[currentKey()]; if (r && r.corrected) speak(r.corrected); };
+  $("autoGram").checked = !!store.get("jay.autoGram", false);
+  $("autoGram").onchange = () => { store.set("jay.autoGram", $("autoGram").checked); if ($("autoGram").checked) checkGrammar(); };
+
   $("playMineBtn").onclick = () => { if (myAudioUrl) new Audio(myAudioUrl).play(); };
   $("prevBtn").onclick = () => go(state.idx - 1);
   $("nextBtn").onclick = () => go(state.idx + 1);
@@ -736,7 +880,8 @@ textarea {
     if (e.target.matches("textarea, input, select")) return;
     if (e.key === "ArrowRight") go(state.idx + 1);
     else if (e.key === "ArrowLeft") go(state.idx - 1);
-    else if (e.key.toLowerCase() === "l") speak(state.lines[state.idx]);
+    else if (e.key.toLowerCase() === "l") speak(currentText());
+    else if (e.key.toLowerCase() === "g") checkGrammar();
     else if (e.key.toLowerCase() === "r" && SR) $("recBtn").click();
   });
 
