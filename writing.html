@@ -843,7 +843,9 @@ Rules for the JSON you return:
     renderChrome();
     const v = $("#view"), a = document.activeElement;
     const keep = a && a.id && v.contains(a) ? { id: a.id, s: a.selectionStart, e: a.selectionEnd, top: a.scrollTop } : null;
-    const vals = [...v.querySelectorAll("input[id]")].map(i => [i.id, i.value]); // the textarea's text lives in the session
+    // Typed input values are carried over only when the same view is redrawn (the textarea's text lives in the session).
+    const vals = v.drawnTab === tab ? [...v.querySelectorAll("input[id]")].map(i => [i.id, i.value]) : [];
+    v.drawnTab = tab;
     if (tab === "review") v.innerHTML = reviewView();
     else if (tab === "report") v.innerHTML = reportView();
     else if (tab === "rewrite") v.innerHTML = rewriteView();
@@ -1081,13 +1083,15 @@ Rules for the JSON you return:
       ${all.length ? `<details><summary class="note">저장된 카드 ${all.length}장 보기</summary><ul class="list" style="margin-top:8px">${all.map(c => `<li><div class="t"><b>${c.kind === "fix" ? `${esc(c.wrong)} → ${esc(c.expr)}` : esc(c.expr)}</b><span>${c.kind === "fix" ? "내 실수" : esc(c.meaning)} · ${c.due <= Date.now() ? "오늘 복습" : `${md(new Date(c.due))} 복습`}</span></div><button class="btn small" data-act="delCard" data-id="${c.id}" aria-label="${esc(c.expr)} 카드 삭제">삭제</button></li>`).join("")}</ul></details>` : ""}
     </section>`;
   }
-  // Right means the expected phrase itself (an expression may drop a leading to/a/the), the whole corrected sentence,
-  // or, for an error card, an exact piece of the corrected sentence that contains the fix ("If I had known").
+  // Right means the expected phrase itself, the whole corrected sentence, or, for an error card, an exact piece of the
+  // corrected sentence that contains the fix ("If I had known"). Only expression cards may drop a leading to/a/an/the,
+  // and an error card never accepts the learner's original mistake.
   function isRight(c, guess) {
     const g = normAns(guess), a = normAns(c.expr), strip = t => t.replace(/^(to|a|an|the) /, "");
     if (!g || !a) return false;
-    if (g === a || strip(g) === strip(a)) return true;
-    if (c.kind !== "fix" || !c.fixed) return false;
+    if (g === a) return true;
+    if (c.kind !== "fix") return strip(g) === strip(a);
+    if (!c.fixed || g === normAns(c.wrong || "")) return false;
     const f = ` ${normAns(c.fixed)} `;
     return g === f.trim() || (f.includes(` ${g} `) && ` ${g} `.includes(` ${a} `));
   }
@@ -1101,11 +1105,14 @@ Rules for the JSON you return:
   function addCards(fb, text) {
     const n = { expr: 0, fix: 0, capped: false }, due = startOfDay(Date.now(), 1), now = Date.now();
     let room = CARD_CAP - data.cards.filter(c => c.added >= startOfDay(now)).length;
-    const has = (kind, a) => data.cards.some(c => c.kind === kind && normAns(c.expr) === normAns(a));
+    // An expression is saved once; an error card is a duplicate only when the same mistake was corrected the same way,
+    // or when a multi-word fix repeats (one card for "went" from "I goed" and "we goed" would hide short fixes like "the").
+    const has = (kind, a, wrong) => data.cards.some(c => c.kind === kind && normAns(c.expr) === normAns(a)
+      && (kind === "expr" || normAns(c.wrong || "") === normAns(wrong) || words(a) >= 2));
     const hot = new Set(topWeakCats());
     const sents = text.match(/[^.!?\n]+[.!?]*/g) || [text];
     for (const it of fb.issues.filter(x => x.type === "grammar" || (x.type === "awkward" && hot.has(x.category))).slice(0, 3)) {
-      if (has("fix", it.fix)) continue;
+      if (has("fix", it.fix, it.original)) continue;
       if (room <= 0) { n.capped = true; break; }
       const context = (sents.find(s => findSpan(s, it.original, 0) >= 0) || it.original).trim();
       const at = findSpan(context, it.original, 0);
