@@ -217,8 +217,8 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
     <div class="stats" id="stats"></div>
   </header>
   <nav class="row between">
-    <a href="index.html" class="note">← 인터뷰 따라 말하기</a>
-    <button class="linkbtn" id="keyBtn" type="button">API 키 설정</button>
+    <a href="index.html" class="note" id="backLink">← 인터뷰 따라 말하기</a>
+    <button class="linkbtn" id="keyBtn" type="button" hidden>API 키 설정</button>
   </nav>
 
   <div class="banner" id="keyBanner" hidden>
@@ -302,11 +302,46 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
   };
   const data = Object.assign({ entries: [], cards: [] }, store.get(DATA_KEY, {}));
   let saveFailed = false;
-  function save() {
+  // Pass the entry that changed so it can be written to the viewer's account too.
+  function save(changed) {
     if (data.entries.length > 400) data.entries = data.entries.slice(-400);
     saveFailed = !store.set(DATA_KEY, data);
+    if (cloud.ref) push(changed ? [changed] : []);
   }
   const apiKey = { get: () => store.get(KEY_KEY, ""), set: v => store.set(KEY_KEY, v) };
+
+  /* ---------- account sync ---------- */
+  // Opened on claude.ai, records live in the viewer's private db subtree (one doc per entry, cards in the state doc),
+  // so they follow the viewer across devices. Anywhere else localStorage is the only store.
+  const cloud = { ref: null, queue: Promise.resolve(), failed: false };
+  function push(entries) {
+    const ref = cloud.ref;
+    cloud.queue = cloud.queue.then(async () => {
+      for (const e of entries) await ref.collection("entries").doc(e.id).set(e);
+      await ref.set({ cards: data.cards, updated: Date.now() });
+    }).catch(() => { cloud.ref = null; cloud.failed = true; render(); });
+  }
+  async function connectCloud() {
+    if (!window.claude?.use) return;
+    const [db, user] = await Promise.all([claude.use("db"), claude.use("user")]);
+    const id = db && user ? await user.id() : null;
+    if (!id) return;
+    const ref = db.doc(`data/users/${id}/state`);
+    try {
+      const [state, list] = await Promise.all([ref.get(), ref.collection("entries").get()]);
+      const remote = new Map(list.docs.map(d => [d.id, structuredClone(d.data())]));
+      const localOnly = data.entries.filter(e => !remote.has(e.id));
+      data.entries = [...remote.values(), ...localOnly].sort((a, b) => a.ts - b.ts);
+      const cards = new Map(data.cards.map(c => [c.id, c]));
+      for (const c of (state.exists && state.data().cards) || []) cards.set(c.id, structuredClone(c));
+      const cardsChanged = cards.size !== ((state.exists && state.data().cards) || []).length;
+      data.cards = [...cards.values()];
+      cloud.ref = ref;
+      store.set(DATA_KEY, data);
+      if (localOnly.length || cardsChanged) push(localOnly);
+    } catch { cloud.failed = true; }
+    render();
+  }
 
   /* ---------- helpers ---------- */
   const $ = s => document.querySelector(s);
@@ -398,8 +433,48 @@ Rules for the JSON you return:
     return s;
   }
 
-  let sdk;
+  // On claude.ai the page asks Claude on the viewer's own account (no API key); elsewhere it needs an Anthropic API key.
+  const ai = { sample: null, known: false };
+  const aiReady = (async () => { if (window.claude?.use) ai.sample = await claude.use("sample"); })()
+    .catch(() => {}).finally(() => { ai.known = true; render(); });
+  const SHAPE = `{"score": 0-100, "verdict": "...", "praise": "...", "issues": [{"original": "...", "fix": "...", "type": "${Object.keys(TYPE_LABEL).join("|")}", "category": "${Object.keys(CATS).join("|")}", "why": "..."}], "corrected": "...", "model_answers": [{"text": "...", "note": "..."}], "expressions": [{"expression": "...", "meaning": "...", "example": "..."}], "resolved_previous": [0]}`;
+  const SAMPLE_ERRORS = {
+    not_granted: "Claude 사용을 허용하지 않아서 피드백을 받을 수 없어요. 페이지를 다시 열고 허용해 주세요.",
+    sampling_disabled: "이 계정에서는 Claude를 쓸 수 없어요.",
+    rate_limited: "Claude 사용량 한도에 닿았어요. 잠시 후 다시 시도해 주세요.",
+    session_expired: "claude.ai에 다시 로그인해 주세요.",
+    refused: "이 글에는 피드백을 줄 수 없어요. 내용을 바꿔서 다시 시도해 주세요.",
+    prompt_too_large: "글이 너무 길어요. 조금 줄여서 다시 시도해 주세요.",
+    invalid_json: "피드백을 읽지 못했어요. 다시 시도해 주세요.",
+    empty_completion: "피드백을 읽지 못했어요. 다시 시도해 주세요."
+  };
   async function askClaude(mode, p, text, prevIssues) {
+    await aiReady;
+    if (!ai.sample) return normalize(await askApi(mode, p, text, prevIssues));
+    const prompt = `${SYSTEM}\n\n${taskText(mode, p, text, prevIssues)}\n\nReply with only one JSON object in exactly this shape:\n${SHAPE}`;
+    try {
+      return normalize(await ai.sample.json(prompt, { modelTier: "default", effort: "low", cache: false }));
+    } catch (e) {
+      throw new Error(SAMPLE_ERRORS[e?.code] || e?.message && !e.code && e.message || "피드백을 받지 못했어요. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+  // Model output is checked field by field, so a missing or odd value never breaks the page.
+  function normalize(r) {
+    if (!r || typeof r !== "object") throw new Error("피드백을 읽지 못했어요. 다시 시도해 주세요.");
+    const s = v => typeof v === "string" ? v : "", arr = v => Array.isArray(v) ? v : [];
+    return {
+      score: Math.max(0, Math.min(100, Math.round(Number(r.score) || 0))),
+      verdict: s(r.verdict), praise: s(r.praise), corrected: s(r.corrected),
+      issues: arr(r.issues).filter(x => s(x?.original) && s(x.fix) && x.original !== x.fix)
+        .map(x => ({ original: x.original, fix: x.fix, type: TYPE_LABEL[x.type] ? x.type : "grammar", category: CATS[x.category] ? x.category : "other", why: s(x.why) })),
+      model_answers: arr(r.model_answers).filter(x => s(x?.text)).map(x => ({ text: x.text, note: s(x.note) })),
+      expressions: arr(r.expressions).filter(x => s(x?.expression)).map(x => ({ expression: x.expression, meaning: s(x.meaning), example: s(x.example) })),
+      resolved_previous: arr(r.resolved_previous).map(Number).filter(Number.isInteger)
+    };
+  }
+
+  let sdk;
+  async function askApi(mode, p, text, prevIssues) {
     const key = apiKey.get();
     if (!key) throw new Error("NO_KEY");
     if (!sdk) sdk = (await import(SDK_URL)).default;
@@ -450,7 +525,9 @@ Rules for the JSON you return:
       <div><b>${s}일</b><span>연속 작성</span></div>
       <div><b>${w}</b><span>이번 주 단어</span></div>
       <div><b>${due}</b><span>복습할 카드</span></div>`;
-    $("#keyBanner").hidden = !!apiKey.get() || !["translate", "expand", "diary", "rewrite"].includes(tab);
+    $("#keyBanner").hidden = !ai.known || !!ai.sample || !!apiKey.get() || !["translate", "expand", "diary", "rewrite"].includes(tab);
+    $("#keyBtn").hidden = !ai.known || !!ai.sample;
+    $("#backLink").hidden = !!window.claude?.use;
   }
   function renderTabs() {
     const counts = { rewrite: rewriteQueue().length, review: dueCards().length };
@@ -673,8 +750,11 @@ Rules for the JSON you return:
     const max = counts[0]?.[1].n || 1;
     const all = attempts(), scored = all.filter(a => a.fb), avg = scored.length ? Math.round(scored.reduce((s, a) => s + a.fb.score, 0) / scored.length) : 0;
     const reNum = data.entries.filter(e => (e.rewrites || []).length).length;
+    const where = cloud.ref ? "기록은 내 claude.ai 계정에 저장돼요. 다른 사람은 볼 수 없어요."
+      : cloud.failed ? "계정에 기록을 저장하지 못해서 지금은 이 브라우저에만 저장하고 있어요."
+      : "기록은 이 브라우저에만 저장돼요.";
     return `<section class="panel">
-      <span class="label">꾸준함</span>
+      <div class="row between"><span class="label">꾸준함</span><span class="note">${where}</span></div>
       <div class="stats"><div><b>${streak()}일</b><span>연속 작성</span></div><div><b>${all.length}</b><span>쓴 글</span></div><div><b>${reNum}</b><span>다시 써 본 글</span></div><div><b>${avg || "–"}</b><span>평균 점수</span></div></div>
       <div><span class="note">최근 2주</span><div class="days" aria-label="최근 2주 작성한 날">${strip}</div></div>
       ${chartHtml()}
@@ -697,7 +777,8 @@ Rules for the JSON you return:
     const mode = tab, s = sessions[mode];
     const text = s.text.trim();
     if (!words(text)) return;
-    if (!apiKey.get()) { openKey(); return; }
+    await aiReady;
+    if (!ai.sample && !apiKey.get()) { openKey(); return; }
     const e = mode === "rewrite" ? data.entries.find(x => x.id === s.entryId) : null;
     const realMode = e ? e.mode : mode, prompt = e ? e.prompt : s.prompt;
     busy = mode; busyStart = Date.now(); error = "";
@@ -706,16 +787,17 @@ Rules for the JSON you return:
     try {
       const prevIssues = e ? lastAttempt(e).fb.issues : null;
       const fb = await askClaude(realMode, prompt, text, prevIssues);
-      fb.issues = (fb.issues || []).filter(it => it.original !== it.fix);
+      let changed = e;
       if (e) {
         (e.rewrites ||= []).push({ text, fb, ts: Date.now() });
       } else {
         const entry = { id: uid(), mode, prompt, text, fb, ts: Date.now(), rewrites: [] };
         data.entries.push(entry);
         s.entryId = entry.id;
+        changed = entry;
       }
       s.text = text; s.fb = fb; s.prevIssues = prevIssues; s.savedCards = addCards(fb);
-      save();
+      save(changed);
     } catch (err) {
       error = err.message === "NO_KEY" ? "API 키를 먼저 넣어 주세요." : (err.message || "피드백을 받지 못했어요.");
     } finally {
@@ -810,6 +892,7 @@ Rules for the JSON you return:
   });
 
   render();
+  connectCloud();
 </script>
 </body>
 </html>
