@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>영어 쓰기 연습</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: tabs → one practice card (prompt → textarea → feedback) per mode; report and review cards in their own tabs */
+:root {
+  --bg: #f3f5f2;
+  --surface: #ffffff;
+  --fg: #1c2421;
+  --muted: #5d6b65;
+  --line: #d9e0dc;
+  --accent: #1f6f5c;
+  --accent-soft: #dcefe8;
+  --good: #1f7a46;
+  --good-soft: #def3e5;
+  --warn: #8a5208;
+  --warn-soft: #fbeed6;
+  --bad: #b3362b;
+  --bad-soft: #f9e0dd;
+  --adv: #2f5bb7;
+  --adv-soft: #e1e9fa;
+  --on-accent: #ffffff;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111715; --surface: #18201d; --fg: #e5ece8; --muted: #93a39c; --line: #2a3531;
+    --accent: #5cc4a7; --accent-soft: #1d3a32; --good: #5fcf8c; --good-soft: #1a3324;
+    --warn: #e7a94b; --warn-soft: #3a2c15; --bad: #f0806f; --bad-soft: #3d1f1b;
+    --adv: #8fb0f5; --adv-soft: #1e2a45; --on-accent: #0d1a16;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111715; --surface: #18201d; --fg: #e5ece8; --muted: #93a39c; --line: #2a3531;
+  --accent: #5cc4a7; --accent-soft: #1d3a32; --good: #5fcf8c; --good-soft: #1a3324;
+  --warn: #e7a94b; --warn-soft: #3a2c15; --bad: #f0806f; --bad-soft: #3d1f1b;
+  --adv: #8fb0f5; --adv-soft: #1e2a45; --on-accent: #0d1a16;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 48px;
+}
+button, select, input, textarea { font: inherit; }
+.wrap { max-width: 780px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.6rem; margin: 0; letter-spacing: -0.01em; line-height: 1.2; }
+h1 span { color: var(--accent); }
+h2 { font-family: var(--display); font-weight: 700; font-size: 1.15rem; margin: 0; }
+.stats { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.stats div { display: grid; }
+.stats b { font-family: var(--display); font-size: 1.2rem; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.stats span { font-size: 0.72rem; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; min-width: 0; display: grid; gap: 14px; }
+.label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.note { font-size: 0.84rem; color: var(--muted); margin: 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.between { justify-content: space-between; }
+.banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; }
+.banner.bad { background: var(--bad-soft); color: var(--bad); }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+a { color: var(--accent); }
+
+/* buttons */
+.btn {
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px;
+  min-height: 44px; padding: 8px 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 500;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.small { min-height: 40px; padding: 4px 12px; font-size: 0.85rem; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip {
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; cursor: pointer;
+  min-height: 36px; padding: 4px 12px; font-size: 0.84rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.linkbtn { border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; padding: 6px 2px; min-height: 36px; }
+
+/* tabs */
+.tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 12px; cursor: pointer;
+  min-height: 44px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px; font-weight: 500;
+}
+.tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tab .n { font-family: var(--mono); font-size: 0.75rem; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 0 7px; }
+.tab[aria-selected="true"] .n { background: var(--on-accent); }
+
+/* practice card */
+.prompt { font-family: var(--display); font-weight: 500; font-size: clamp(1.25rem, 3.4vw, 1.7rem); line-height: 1.45; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.prompt small { display: block; font-family: var(--body); font-size: 0.9rem; color: var(--muted); font-weight: 400; margin-top: 4px; }
+.level { font-size: 0.75rem; border-radius: 999px; padding: 1px 9px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+textarea {
+  width: 100%; min-height: 130px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg);
+  padding: 12px 14px; font-size: 1.05rem; line-height: 1.6;
+}
+textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.custom input { flex: 1 1 240px; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); padding: 8px 12px; }
+.meter { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.meter b { color: var(--fg); font-weight: 500; }
+.meter .ok { color: var(--good); }
+.rewrite-note { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 14px; font-size: 0.9rem; }
+
+/* feedback */
+.fb { display: grid; gap: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+.scoreline { display: flex; gap: 14px; align-items: center; }
+.score { font-family: var(--display); font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.score small { font-size: 0.9rem; color: var(--muted); font-weight: 500; }
+.verdict { margin: 0; }
+.praise { margin: 0; color: var(--good); font-size: 0.9rem; }
+.marked { font-size: 1.08rem; line-height: 2; overflow-wrap: anywhere; white-space: pre-wrap; background: var(--bg); border-radius: 12px; padding: 10px 14px; }
+.mk { border-radius: 4px; padding: 1px 2px; cursor: pointer; text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.mk.grammar { background: var(--bad-soft); text-decoration-color: var(--bad); }
+.mk.awkward { background: var(--warn-soft); text-decoration-color: var(--warn); text-decoration-style: wavy; }
+.mk.advanced { background: var(--adv-soft); text-decoration-color: var(--adv); text-decoration-style: dotted; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.legend .grammar::before { background: var(--bad); }
+.legend .awkward::before { background: var(--warn); }
+.legend .advanced::before { background: var(--adv); }
+.issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.issue { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; scroll-margin: 80px; }
+.issue.grammar { border-left-color: var(--bad); }
+.issue.awkward { border-left-color: var(--warn); }
+.issue.advanced { border-left-color: var(--adv); }
+.issue.flash { animation: flash 1.2s; }
+@keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .issue.flash { animation: none; } }
+.tag { font-size: 0.72rem; font-weight: 600; border-radius: 999px; padding: 1px 8px; }
+.tag.grammar { background: var(--bad-soft); color: var(--bad); }
+.tag.awkward { background: var(--warn-soft); color: var(--warn); }
+.tag.advanced { background: var(--adv-soft); color: var(--adv); }
+.tag.cat { background: var(--bg); color: var(--muted); }
+.tag.hot { background: var(--bad); color: #fff; }
+.change { font-size: 1rem; overflow-wrap: anywhere; }
+.change del { color: var(--muted); }
+.change ins { text-decoration: none; font-weight: 600; }
+.why { margin: 0; font-size: 0.9rem; color: var(--muted); }
+.box { background: var(--bg); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; }
+.box p { margin: 0; }
+.en { font-size: 1.02rem; overflow-wrap: anywhere; }
+.answers { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.answers li { display: grid; gap: 2px; }
+.answers small, .exprs small { color: var(--muted); font-size: 0.84rem; }
+.exprs { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.compare { border-radius: 12px; padding: 12px 14px; background: var(--good-soft); display: grid; gap: 6px; }
+.compare.mixed { background: var(--warn-soft); }
+.compare ul { margin: 0; padding-left: 1.2em; font-size: 0.9rem; }
+.loading { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 0.9rem; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* lists */
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.list li { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.list .t { min-width: 0; flex: 1 1 260px; }
+.list .t b { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.list .t span { font-size: 0.8rem; color: var(--muted); }
+.empty { color: var(--muted); font-size: 0.9rem; margin: 0; }
+
+/* review cards */
+.card { border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; background: var(--bg); }
+.card .meaning { font-size: 1.15rem; font-weight: 600; margin: 0; }
+.card .answer { font-family: var(--display); font-size: 1.35rem; margin: 0; overflow-wrap: anywhere; }
+.card input { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); padding: 8px 12px; width: 100%; }
+
+/* report */
+.chart { display: grid; gap: 6px; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .bar { fill: var(--accent); opacity: .55; cursor: pointer; }
+.chart .bar.cur, .chart .bar.on { opacity: 1; }
+.chart .hit { fill: transparent; cursor: pointer; }
+.chart text { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+.chart text.v { fill: var(--fg); }
+.chart .base { stroke: var(--line); }
+.readout { font-size: 0.85rem; color: var(--muted); min-height: 1.5em; margin: 0; font-variant-numeric: tabular-nums; }
+.readout b { color: var(--fg); }
+.weak { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.weak li { display: grid; gap: 4px; }
+.weak .top { display: flex; justify-content: space-between; gap: 8px; font-size: 0.92rem; }
+.weak .top span { color: var(--muted); font-family: var(--mono); font-size: 0.8rem; }
+.track { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.weak .ex { font-size: 0.84rem; color: var(--muted); overflow-wrap: anywhere; }
+.days { display: flex; gap: 4px; }
+.days i { flex: 1 1 0; max-width: 24px; aspect-ratio: 1; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.days i.on { background: var(--accent); border-color: var(--accent); }
+.days i.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--fg); padding: 20px; width: min(460px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgb(0 0 0 / .4); }
+dialog form { display: grid; gap: 12px; }
+dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); padding: 8px 12px; width: 100%; font-family: var(--mono); font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>영어 <span>쓰기 연습</span></h1>
+    <div class="stats" id="stats"></div>
+  </header>
+  <nav class="row between">
+    <a href="index.html" class="note">← 인터뷰 따라 말하기</a>
+    <button class="linkbtn" id="keyBtn" type="button">API 키 설정</button>
+  </nav>
+
+  <div class="banner" id="keyBanner" hidden>
+    피드백을 받으려면 Anthropic API 키가 필요해요. <button class="linkbtn" type="button" data-act="openKey">키 입력하기</button>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="연습 방식" id="tabs"></div>
+  <main id="view"></main>
+</div>
+
+<dialog id="keyDlg">
+  <form method="dialog" id="keyForm">
+    <h2>Anthropic API 키</h2>
+    <p class="note">키는 이 기기의 브라우저에만 저장되고, 피드백을 요청할 때 Anthropic API로만 전송돼요. 키는 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>에서 만들 수 있어요.</p>
+    <label class="visually-hidden" for="keyInput">API 키</label>
+    <input id="keyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+    <div class="row between">
+      <button class="linkbtn" type="button" id="keyClear">키 지우기</button>
+      <div class="row">
+        <button class="btn small" value="cancel" formnovalidate>취소</button>
+        <button class="btn small primary" value="save">저장</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+  /* ---------- content ---------- */
+  const SENTENCES = [
+    ["나는 매일 아침 커피를 한 잔 마셔요.", 1], ["어제 친구랑 영화 보러 갔어요.", 1], ["이 근처에 괜찮은 식당 있어요?", 1],
+    ["회의가 30분 늦게 시작했어요.", 1], ["주말에 비가 오면 집에서 쉴 거예요.", 1], ["그 책은 생각보다 훨씬 재미있었어요.", 1],
+    ["내일까지 보고서를 끝내야 해요.", 1], ["집에 오자마자 바로 잠들었어요.", 1], ["그 소식을 듣고 깜짝 놀랐어요.", 1],
+    ["요즘 일이 너무 많아서 잠을 잘 못 자요.", 2], ["저는 3년째 이 회사에서 일하고 있어요.", 2], ["혹시 시간 괜찮으면 잠깐 얘기할 수 있을까요?", 2],
+    ["영어로 말할 때 실수할까 봐 걱정돼요.", 2], ["그는 내가 만난 사람 중에 가장 친절한 사람이에요.", 2], ["길이 막혀서 약속에 늦을 것 같아요.", 2],
+    ["이 문제는 생각보다 해결하기 어려워요.", 2], ["새로운 걸 배우는 건 언제나 설레요.", 2], ["가격에 비해 품질이 정말 좋아요.", 2],
+    ["어릴 때는 채소를 싫어했는데 지금은 좋아해요.", 2], ["우리가 처음 만난 게 벌써 5년 전이에요.", 2], ["처음엔 어색했지만 금방 익숙해졌어요.", 2],
+    ["진작 말해 줬으면 좋았을 텐데.", 3], ["저는 운동을 시작한 뒤로 훨씬 덜 피곤해요.", 3], ["그 일은 제 잘못이 아니었지만 사과했어요.", 3],
+    ["이번 프로젝트 덕분에 많은 걸 배웠어요.", 3], ["바쁘실 텐데 시간 내 주셔서 감사합니다.", 3], ["결정하기 전에 조금만 더 생각해 볼게요.", 3],
+    ["이 앱을 쓰면 시간을 많이 아낄 수 있어요.", 3], ["마감이 다가올수록 더 집중이 잘 돼요.", 3], ["만약 내가 너라면 그 제안을 받아들일 거야.", 3]
+  ].map(([ko, level]) => ({ ko, level }));
+  const LEVELS = { 1: "기초", 2: "중급", 3: "도전" };
+  const BASES = ["I ate lunch.", "I went to the park.", "She called me.", "We watched a movie.", "I was tired.", "He bought a new phone.",
+    "I studied English.", "It rained.", "They moved to Seoul.", "I cooked dinner.", "The meeting ended.", "I missed the bus.", "We talked.",
+    "I cleaned my room.", "She smiled.", "I took a walk.", "My phone broke.", "I read a book.", "The store was closed.", "I woke up early."];
+  const EXPAND_HINTS = ["언제 (when)", "어디서 (where)", "누구와 (with)", "왜 (because)", "어떻게 (how)", "그래서 (so)"];
+  const TOPICS = [
+    ["어제 가장 피곤했던 순간", "The most tiring moment yesterday"], ["요즘 자주 먹는 음식", "Food I eat a lot these days"],
+    ["이번 주에 고마웠던 사람", "Someone I was thankful for this week"], ["최근에 산 물건 중 가장 만족스러운 것", "The best thing I bought recently"],
+    ["출근(등교)길에 본 것", "Something I saw on my way to work or school"], ["오늘 꼭 하고 싶은 일 한 가지", "One thing I really want to do today"],
+    ["최근에 웃었던 일", "Something that made me laugh recently"], ["요즘 빠져 있는 것", "Something I'm into these days"],
+    ["어렸을 때 좋아했던 장소", "A place I loved as a child"], ["이번 주말 계획", "My plans for this weekend"],
+    ["최근에 배운 것", "Something I learned recently"], ["나를 짜증 나게 하는 작은 일", "A small thing that annoys me"],
+    ["가장 좋아하는 계절과 이유", "My favorite season and why"], ["요즘 고민", "Something on my mind lately"],
+    ["돈이 아깝지 않았던 경험", "Money well spent"], ["오늘 날씨와 기분", "Today's weather and my mood"],
+    ["최근에 본 영화나 드라마", "A movie or show I watched recently"], ["바꾸고 싶은 습관 하나", "A habit I want to change"],
+    ["가장 기억에 남는 여행", "My most memorable trip"], ["누군가에게 해 주고 싶은 조언", "Advice I'd like to give someone"],
+    ["내가 사는 동네 소개", "My neighborhood"], ["최근에 한 실수", "A mistake I made recently"],
+    ["나의 아침 루틴", "My morning routine"], ["스트레스를 푸는 방법", "How I relieve stress"],
+    ["1년 전의 나와 달라진 점", "How I've changed since last year"], ["가장 자주 쓰는 앱", "The app I use the most"],
+    ["하루 휴가가 생긴다면", "If I had a day off tomorrow"], ["최근에 들은 칭찬", "A compliment I got recently"],
+    ["요즘 자주 듣는 노래", "A song I listen to a lot"], ["내가 잘하는 것 하나", "One thing I'm good at"]
+  ].map(([topic, en]) => ({ topic, en }));
+
+  const MODES = {
+    translate: { name: "한→영 번역", short: "번역" },
+    expand: { name: "문장 확장", short: "확장" },
+    diary: { name: "오늘의 3문장 일기", short: "일기" }
+  };
+  const TYPE_LABEL = { grammar: "문법 오류", awkward: "어색한 표현", advanced: "더 고급 표현" };
+  const CATS = {
+    article: "관사", tense: "시제", preposition: "전치사", agreement: "수 일치", plural: "단수·복수", word_order: "어순",
+    word_choice: "단어 선택", collocation: "단어 궁합", sentence_structure: "문장 구조", spelling: "철자", punctuation: "문장부호", other: "기타"
+  };
+  const CARD_STEPS = [0, 1, 3, 7, 14, 30]; // days until next review for each box
+
+  /* ---------- storage ---------- */
+  const DATA_KEY = "write.data", KEY_KEY = "write.apiKey";
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+  };
+  const data = Object.assign({ entries: [], cards: [] }, store.get(DATA_KEY, {}));
+  let saveFailed = false;
+  function save() {
+    if (data.entries.length > 400) data.entries = data.entries.slice(-400);
+    saveFailed = !store.set(DATA_KEY, data);
+  }
+  const apiKey = { get: () => store.get(KEY_KEY, ""), set: v => store.set(KEY_KEY, v) };
+
+  /* ---------- helpers ---------- */
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const pick = (arr, not) => { if (arr.length < 2) return arr[0]; let x; do { x = arr[Math.floor(Math.random() * arr.length)]; } while (x === not); return x; };
+  const words = t => (String(t).match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) || []).length;
+  const sentences = t => String(t).split(/[.!?]+(?:\s|$)/).filter(s => /[A-Za-z]/.test(s)).length;
+  const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const weekStart = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+  const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
+  const todayTopic = () => TOPICS[Math.floor(new Date(dayKey() + "T00:00:00").getTime() / 864e5) % TOPICS.length];
+
+  // Every attempt (first draft or rewrite) counts toward streaks and word totals.
+  function attempts() {
+    const out = [];
+    for (const e of data.entries) {
+      out.push({ e, text: e.text, fb: e.fb, ts: e.ts, rewrite: false });
+      for (const r of e.rewrites || []) out.push({ e, text: r.text, fb: r.fb, ts: r.ts, rewrite: true });
+    }
+    return out;
+  }
+  function activeDays() { return new Set(attempts().map(a => dayKey(new Date(a.ts)))); }
+  function streak() {
+    const days = activeDays();
+    let d = new Date();
+    if (!days.has(dayKey(d))) d = addDays(d, -1);
+    let n = 0;
+    while (days.has(dayKey(d))) { n++; d = addDays(d, -1); }
+    return n;
+  }
+  function weeklyWords(n = 8) {
+    const start = weekStart(new Date());
+    const weeks = Array.from({ length: n }, (_, i) => ({ start: addDays(start, -7 * (n - 1 - i)), words: 0 }));
+    for (const a of attempts()) {
+      const w = weekStart(new Date(a.ts)).getTime();
+      const slot = weeks.find(x => x.start.getTime() === w);
+      if (slot) slot.words += words(a.text);
+    }
+    return weeks;
+  }
+  const dueCards = () => data.cards.filter(c => c.due <= Date.now());
+
+  /* ---------- Claude feedback ---------- */
+  const MODEL = "claude-opus-5-5";
+  const SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.132.1/+esm";
+  const SYSTEM = `You are an English writing coach for Korean learners. You give fast, specific feedback on short pieces of writing.
+
+Rules for the JSON you return:
+- All explanations (verdict, praise, why, note, meaning) are in natural Korean. English examples stay in English.
+- issues: every problem worth fixing, in the order it appears. "original" must be copied character-for-character from the learner's text as one contiguous span, as short as possible while still containing the problem. "fix" is the replacement for that span only.
+- type: "grammar" = a clear error; "awkward" = grammatical but unnatural or unclear to a native speaker; "advanced" = already correct, but a more precise or sophisticated alternative exists. Give at most 2 "advanced" items and none when there are many errors.
+- category: the error pattern, so the learner's weak points can be tracked over time.
+- "why" explains the rule or nuance in one or two short sentences, so the learner can avoid the mistake next time.
+- corrected: the learner's whole text, fixed with the smallest changes that make it correct and natural. Keep their meaning, ideas and level.
+- model_answers: different natural versions, each with a short Korean note on how it differs (register, nuance, structure). Show that there is more than one right answer.
+- expressions: 1 to 4 useful phrases from your fixes or model answers that are worth memorizing, with a Korean meaning and a short English example sentence.
+- score: 0-100 for the task as described in the user message. A fully natural, correct answer scores 90 or more.
+- Ignore names, brands and capitalization of proper nouns. If the text is not English, say so in verdict and give model answers.
+- resolved_previous: only for rewrites (see the user message); otherwise an empty array.`;
+  const str = { type: "string" };
+  const obj = props => ({ type: "object", properties: props, required: Object.keys(props), additionalProperties: false });
+  const SCHEMA = obj({
+    score: { type: "integer" },
+    verdict: str,
+    praise: str,
+    issues: { type: "array", items: obj({ original: str, fix: str, type: { type: "string", enum: Object.keys(TYPE_LABEL) }, category: { type: "string", enum: Object.keys(CATS) }, why: str }) },
+    corrected: str,
+    model_answers: { type: "array", items: obj({ text: str, note: str }) },
+    expressions: { type: "array", items: obj({ expression: str, meaning: str, example: str }) },
+    resolved_previous: { type: "array", items: { type: "integer" } }
+  });
+
+  function taskText(mode, p, text, prevIssues) {
+    let s;
+    if (mode === "translate") {
+      s = `Task: translate a Korean sentence into English.\nKorean: ${p.ko}\n\nLearner's translation:\n${text}\n\nScore meaning accuracy first, then grammar and naturalness. model_answers: 3 or 4 natural translations that differ in wording or register (casual / neutral / formal). If the learner's translation is already fine, say so clearly in verdict.`;
+    } else if (mode === "expand") {
+      s = `Task: sentence expansion. Base sentence: "${p.base}"\nThe learner makes it longer by adding details such as time, place, people, reason, manner or result.\n\nLearner's expanded sentence(s):\n${text}\n\nScore both correctness and how well details were added and connected (because, when, after, so, relative clauses). In verdict, say which kinds of detail they added and one kind they could still add. model_answers: 3 expansions of the base sentence, from simple to rich.`;
+    } else {
+      s = `Task: a short diary entry of 3 to 5 sentences on today's topic: "${p.topic}" (${p.en}).\n\nLearner's diary:\n${text}\n\nScore correctness and naturalness; mention in verdict if it is off-topic or outside 3-5 sentences. model_answers: 2 natural rewrites of the learner's diary one step above their level, keeping their content.`;
+    }
+    if (prevIssues) {
+      s += `\n\nThis is a REWRITE: the learner wrote the task again from memory without looking at the earlier feedback. Earlier issues (index: original → fix):\n` +
+        prevIssues.map((x, i) => `${i}: "${x.original}" → "${x.fix}"`).join("\n") +
+        `\nPut in resolved_previous the indexes of earlier issues that the learner fixed or avoided this time. Leave out the ones they repeated.`;
+    }
+    return s;
+  }
+
+  let sdk;
+  async function askClaude(mode, p, text, prevIssues) {
+    const key = apiKey.get();
+    if (!key) throw new Error("NO_KEY");
+    if (!sdk) sdk = (await import(SDK_URL)).default;
+    const Anthropic = sdk;
+    const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+    let res;
+    try {
+      res = await client.beta.messages.create({
+        model: MODEL,
+        max_tokens: 16000,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
+        system: SYSTEM,
+        messages: [{ role: "user", content: taskText(mode, p, text, prevIssues) }]
+      });
+    } catch (err) {
+      if (err instanceof Anthropic.AuthenticationError) throw new Error("API 키가 올바르지 않아요. 키를 다시 확인해 주세요.");
+      if (err instanceof Anthropic.PermissionDeniedError) throw new Error("이 키로는 요청할 수 없어요. 키의 권한을 확인해 주세요.");
+      if (err instanceof Anthropic.RateLimitError) throw new Error("요청이 너무 많아요. 잠시 후 다시 시도해 주세요.");
+      if (err instanceof Anthropic.APIConnectionError) throw new Error("네트워크에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.");
+      if (err instanceof Anthropic.APIError) throw new Error(`피드백 요청이 실패했어요 (${err.status ?? "오류"}). 잠시 후 다시 시도해 주세요.`);
+      throw err;
+    }
+    if (res.stop_reason === "refusal") throw new Error("이 글에는 피드백을 줄 수 없어요. 내용을 바꿔서 다시 시도해 주세요.");
+    if (res.stop_reason === "max_tokens") throw new Error("글이 너무 길어서 피드백이 잘렸어요. 조금 줄여서 다시 시도해 주세요.");
+    const json = res.content.filter(b => b.type === "text").map(b => b.text).join("");
+    try { return JSON.parse(json); } catch { throw new Error("피드백을 읽지 못했어요. 다시 시도해 주세요."); }
+  }
+
+  /* ---------- state ---------- */
+  const TABS = ["translate", "expand", "diary", "rewrite", "review", "report"];
+  let tab = store.get("write.tab", "translate");
+  if (!TABS.includes(tab)) tab = "translate";
+  // One practice session per tab: what is on screen, the draft, and the latest result.
+  const sessions = {
+    translate: { prompt: pick(SENTENCES.filter(s => s.level === 1)), text: "", entryId: null, fb: null },
+    expand: { prompt: { base: pick(BASES) }, text: "", entryId: null, fb: null },
+    diary: { prompt: todayTopic(), text: "", entryId: null, fb: null },
+    rewrite: { entryId: null, text: "", fb: null }
+  };
+  let busy = null, busyStart = 0, error = "", review = { id: null, shown: false, guess: "" };
+
+  /* ---------- rendering ---------- */
+  function renderStats() {
+    const s = streak(), w = weeklyWords(1)[0].words, due = dueCards().length;
+    $("#stats").innerHTML = `
+      <div><b>${s}일</b><span>연속 작성</span></div>
+      <div><b>${w}</b><span>이번 주 단어</span></div>
+      <div><b>${due}</b><span>복습할 카드</span></div>`;
+    $("#keyBanner").hidden = !!apiKey.get() || !["translate", "expand", "diary", "rewrite"].includes(tab);
+  }
+  function renderTabs() {
+    const counts = { rewrite: rewriteQueue().length, review: dueCards().length };
+    const names = { ...Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, v.short])), rewrite: "다시 쓰기", review: "복습 카드", report: "약점 리포트" };
+    $("#tabs").innerHTML = TABS.map(t => `<button class="tab" role="tab" aria-selected="${t === tab}" data-tab="${t}">${names[t]}${counts[t] ? `<span class="n">${counts[t]}</span>` : ""}</button>`).join("");
+  }
+  function render() {
+    renderStats(); renderTabs();
+    const v = $("#view");
+    if (tab === "review") v.innerHTML = reviewView();
+    else if (tab === "report") v.innerHTML = reportView();
+    else if (tab === "rewrite") v.innerHTML = rewriteView();
+    else v.innerHTML = practiceView(tab);
+    const ta = v.querySelector("textarea");
+    if (ta && !sessions[tab]?.fb && !busy && document.activeElement === document.body) ta.focus({ preventScroll: true });
+  }
+
+  function promptHtml(mode, p) {
+    if (mode === "translate") return `<p class="prompt">${esc(p.ko)}<small>영어로 옮겨 보세요.${p.level ? ` <span class="level">${LEVELS[p.level]}</span>` : ""}</small></p>`;
+    if (mode === "expand") return `<p class="prompt">${esc(p.base)}<small>시간·장소·이유 같은 정보를 붙여 더 길고 풍부한 문장으로 만들어 보세요.</small></p>`;
+    return `<p class="prompt">${esc(p.topic)}<small>${esc(p.en)} · 3~5문장</small></p>`;
+  }
+  function meterHtml(mode, text, p) {
+    const w = words(text), s = sentences(text);
+    if (mode === "diary") return `<span class="meter"><b class="${s >= 3 && s <= 5 ? "ok" : ""}">${s}</b> / 3~5문장 · <b>${w}</b>단어</span>`;
+    if (mode === "expand") { const base = words(p.base), goal = Math.max(12, base * 3); return `<span class="meter"><b class="${w >= goal ? "ok" : ""}">${w}</b> / ${goal}단어 목표</span>`; }
+    return `<span class="meter"><b>${w}</b>단어</span>`;
+  }
+
+  function practiceView(mode) {
+    const s = sessions[mode];
+    const head = `<div class="row between"><span class="label">${MODES[mode].name}</span>${s.fb ? "" : nextBtns(mode)}</div>`;
+    let tools = "";
+    if (mode === "translate" && !s.fb) tools = `
+      <form class="row custom" data-form="custom"><label class="visually-hidden" for="customKo">직접 넣을 한국어 문장</label>
+        <input id="customKo" placeholder="연습하고 싶은 한국어 문장을 직접 넣어도 돼요"><button class="btn small">이 문장으로</button></form>`;
+    if (mode === "expand" && !s.fb) tools = `<div class="row" aria-label="붙여 볼 정보">${EXPAND_HINTS.map(h => `<span class="chip" aria-hidden="true">${h}</span>`).join("")}</div>`;
+    return `<section class="panel">${head}${promptHtml(mode, s.prompt)}${tools}${editorHtml(mode, s)}${s.fb ? feedbackHtml(mode, s) : ""}</section>`;
+  }
+  function nextBtns(mode) {
+    if (mode === "translate") return `<div class="row">${[1, 2, 3].map(l => `<button class="chip" data-act="newSentence" data-level="${l}">${LEVELS[l]} 새 문장</button>`).join("")}</div>`;
+    if (mode === "expand") return `<button class="chip" data-act="newPrompt">다른 문장</button>`;
+    return `<button class="chip" data-act="newPrompt">다른 주제</button>`;
+  }
+  function editorHtml(mode, s, rewriteOf) {
+    if (s.fb) return `<div class="box"><span class="label">${rewriteOf ? "다시 쓴 글" : "내가 쓴 글"}</span>${markedHtml(s.text, s.fb.issues)}<div class="legend"><span class="grammar">문법 오류</span><span class="awkward">어색한 표현</span><span class="advanced">더 고급 표현</span></div></div>`;
+    const p = rewriteOf ? rewriteOf.prompt : s.prompt;
+    const loading = busy === tab;
+    return `
+      <label class="visually-hidden" for="draft">영어로 쓰기</label>
+      <textarea id="draft" spellcheck="false" autocapitalize="sentences" placeholder="${mode === "diary" ? "Write 3-5 sentences in English..." : "Write in English..."}" ${loading ? "disabled" : ""}>${esc(s.text)}</textarea>
+      <div class="row between">${meterHtml(mode, s.text, p)}
+        <button class="btn primary" data-act="submit" ${loading || !words(s.text) ? "disabled" : ""}>${loading ? "피드백 받는 중…" : "피드백 받기"}</button></div>
+      ${loading ? `<div class="loading" role="status"><span class="spinner"></span><span>글을 읽고 있어요 · <span id="elapsed">0</span>초</span></div>` : ""}
+      ${error && !loading ? `<div class="banner bad" role="alert">${esc(error)}</div>` : ""}
+      <p class="note">Ctrl(⌘) + Enter로도 보낼 수 있어요.</p>`;
+  }
+
+  // Wrap each issue's original span in the learner's text; issues that can't be located are still listed below.
+  function locate(text, issues) {
+    const taken = [];
+    let cursor = 0;
+    issues.forEach((it, i) => {
+      if (!it.original) return;
+      let at = text.indexOf(it.original, cursor);
+      if (at < 0) at = text.indexOf(it.original);
+      while (at >= 0 && taken.some(r => at < r.end && at + it.original.length > r.start)) at = text.indexOf(it.original, at + 1);
+      if (at < 0) return;
+      taken.push({ start: at, end: at + it.original.length, i });
+      cursor = at + it.original.length;
+    });
+    return taken.sort((a, b) => a.start - b.start);
+  }
+  function markedHtml(text, issues) {
+    let out = "", pos = 0;
+    for (const r of locate(text, issues)) {
+      const it = issues[r.i];
+      out += esc(text.slice(pos, r.start)) + `<span role="button" tabindex="0" class="mk ${it.type}" data-act="jump" data-i="${r.i}" title="${esc(TYPE_LABEL[it.type])}: ${esc(it.fix)}">${esc(text.slice(r.start, r.end))}</span>`;
+      pos = r.end;
+    }
+    return `<div class="marked">${out + esc(text.slice(pos))}</div>`;
+  }
+
+  function topWeakCats() {
+    const c = weaknessCounts();
+    return new Set(Object.entries(c).sort((a, b) => b[1].n - a[1].n).slice(0, 3).filter(([, v]) => v.n >= 3).map(([k]) => k));
+  }
+  function feedbackHtml(mode, s, rewriteOf) {
+    const fb = s.fb, hot = topWeakCats();
+    const order = { grammar: 0, awkward: 1, advanced: 2 };
+    const list = fb.issues.map((it, i) => ({ it, i })).sort((a, b) => order[a.it.type] - order[b.it.type]);
+    const errs = fb.issues.filter(x => x.type !== "advanced").length;
+    let compare = "";
+    if (rewriteOf) {
+      const prev = rewriteOf.prevIssues.filter(x => x.type !== "advanced");
+      const prevIdx = rewriteOf.prevIssues.map((x, i) => ({ x, i })).filter(o => o.x.type !== "advanced");
+      const fixed = new Set(fb.resolved_previous || []);
+      const repeated = prevIdx.filter(o => !fixed.has(o.i));
+      compare = prev.length ? `<div class="compare ${repeated.length ? "mixed" : ""}">
+          <b>지난번 지적 ${prev.length}개 중 ${prev.length - repeated.length}개를 고쳤어요${repeated.length ? "" : " 🎉"}</b>
+          ${repeated.length ? `<span class="note">아직 반복된 실수:</span><ul>${repeated.map(o => `<li>${esc(o.x.original)} → <b>${esc(o.x.fix)}</b></li>`).join("")}</ul>` : ""}
+        </div>` : "";
+    }
+    const saved = s.savedCards ? `<p class="note">새 표현 ${s.savedCards}개를 복습 카드에 저장했어요.</p>` : "";
+    return `<div class="fb" aria-live="polite">
+      <div class="scoreline"><div class="score">${Math.max(0, Math.min(100, fb.score | 0))}<small>/100</small></div>
+        <div><p class="verdict">${esc(fb.verdict)}</p>${fb.praise ? `<p class="praise">👍 ${esc(fb.praise)}</p>` : ""}</div></div>
+      ${compare}
+      ${list.length ? `<span class="label">고칠 점 ${errs}개${fb.issues.length > errs ? ` · 더 좋은 표현 ${fb.issues.length - errs}개` : ""}</span>
+      <ol class="issues">${list.map(({ it, i }) => `
+        <li class="issue ${it.type}" id="issue-${i}">
+          <div class="row"><span class="tag ${it.type}">${TYPE_LABEL[it.type]}</span><span class="tag cat">${CATS[it.category] || "기타"}</span>${hot.has(it.category) && it.type !== "advanced" ? `<span class="tag hot">자주 틀림</span>` : ""}</div>
+          <div class="change"><del>${esc(it.original)}</del> → <ins>${esc(it.fix)}</ins></div>
+          <p class="why">${esc(it.why)}</p>
+        </li>`).join("")}</ol>` : `<p class="praise">고칠 곳이 없어요. 완벽해요!</p>`}
+      <div class="box"><span class="label">자연스럽게 고친 글</span><p class="en">${esc(fb.corrected)}</p></div>
+      ${fb.model_answers?.length ? `<div class="box"><span class="label">이렇게도 쓸 수 있어요 · 정답은 하나가 아니에요</span>
+        <ul class="answers">${fb.model_answers.map(a => `<li><span class="en">${esc(a.text)}</span><small>${esc(a.note)}</small></li>`).join("")}</ul></div>` : ""}
+      ${fb.expressions?.length ? `<div class="box"><span class="label">새 표현</span>
+        <ul class="exprs">${fb.expressions.map(x => `<li><b>${esc(x.expression)}</b> · ${esc(x.meaning)}<br><small>${esc(x.example)}</small></li>`).join("")}</ul>${saved}</div>` : ""}
+      <div class="row">
+        <button class="btn primary" data-act="startRewrite">피드백 가리고 다시 쓰기</button>
+        ${rewriteOf ? `<button class="btn" data-act="rewriteDone">목록으로</button>` : `<button class="btn" data-act="next">다음 문제</button>`}
+      </div>
+    </div>`;
+  }
+
+  /* rewrite */
+  function lastAttempt(e) { const r = e.rewrites || []; return r.length ? r[r.length - 1] : e; }
+  function rewriteQueue() {
+    return data.entries.filter(e => !(e.rewrites || []).length && e.fb && e.fb.issues.some(x => x.type !== "advanced")).reverse();
+  }
+  function rewriteView() {
+    const s = sessions.rewrite;
+    const e = s.entryId && data.entries.find(x => x.id === s.entryId);
+    if (e) {
+      const prevIssues = s.prevIssues || lastAttempt(e).fb.issues;
+      const head = `<div class="row between"><span class="label">다시 쓰기 · ${MODES[e.mode].name}</span><button class="chip" data-act="rewriteDone">목록으로</button></div>`;
+      const note = s.fb ? "" : `<div class="rewrite-note">피드백을 보지 말고 같은 문제를 다시 써 보세요. 지난번에 지적받은 곳을 기억해서 고칠수록 실력이 늘어요.${(e.rewrites || []).length ? ` (${e.rewrites.length + 1}번째 쓰기)` : ""}</div>`;
+      return `<section class="panel">${head}${promptHtml(e.mode, e.prompt)}${note}${editorHtml(e.mode, s, e)}${s.fb ? feedbackHtml(e.mode, s, { prevIssues }) : ""}</section>`;
+    }
+    const q = rewriteQueue();
+    const done = data.entries.filter(e => (e.rewrites || []).length).reverse().slice(0, 10);
+    const item = (e, label) => `<li><div class="t"><b>${esc(e.prompt.ko || e.prompt.base || e.prompt.topic)}</b><span>${MODES[e.mode].short} · ${md(new Date(e.ts))} · ${label}</span></div><button class="btn small ${label.startsWith("고칠") ? "primary" : ""}" data-act="openRewrite" data-id="${e.id}">다시 쓰기</button></li>`;
+    return `<section class="panel">
+      <span class="label">다시 쓰기</span>
+      <p class="note">첨삭받은 글을 피드백 없이 다시 써 보세요. 같은 실수를 반복하는지 바로 확인할 수 있어요.</p>
+      ${q.length ? `<ul class="list">${q.map(e => item(e, `고칠 점 ${e.fb.issues.filter(x => x.type !== "advanced").length}개`)).join("")}</ul>` : `<p class="empty">아직 다시 쓸 글이 없어요. 번역·확장·일기에서 피드백을 받으면 여기에 쌓여요.</p>`}
+      ${done.length ? `<span class="label">다시 써 본 글</span><ul class="list">${done.map(e => item(e, `${e.rewrites.length}번 다시 씀 · 최근 ${lastAttempt(e).fb.score}점`)).join("")}</ul>` : ""}
+    </section>`;
+  }
+
+  /* review cards */
+  function reviewView() {
+    const due = dueCards();
+    let card = data.cards.find(c => c.id === review.id && (review.shown || c.due <= Date.now()));
+    if (!card) { card = due[0]; review = { id: card?.id ?? null, shown: false, guess: "" }; }
+    const cardHtml = card ? `<div class="card">
+        <span class="label">이 뜻을 영어로 · 남은 카드 ${due.length}장</span>
+        <p class="meaning">${esc(card.meaning)}</p>
+        ${review.shown ? `<p class="answer">${esc(card.expr)}</p><p class="note">${esc(card.example)}</p>
+          ${review.guess ? `<p class="note">내 답: ${esc(review.guess)}</p>` : ""}
+          <div class="row"><button class="btn" data-act="grade" data-ok="0">몰랐어요</button><button class="btn primary" data-act="grade" data-ok="1">알았어요</button></div>`
+        : `<form class="row" data-form="reveal" style="flex-wrap:nowrap"><label class="visually-hidden" for="guess">영어 표현</label><input id="guess" autocomplete="off" spellcheck="false" placeholder="떠오르는 표현을 써 보세요 (비워도 돼요)"><button class="btn primary">확인</button></form>`}
+      </div>` : `<p class="empty">${data.cards.length ? "오늘 복습할 카드를 다 끝냈어요. 👏" : "피드백에서 나온 새 표현이 자동으로 여기에 저장돼요."}</p>`;
+    const all = [...data.cards].sort((a, b) => b.added - a.added);
+    return `<section class="panel"><span class="label">복습 카드</span>${cardHtml}
+      ${all.length ? `<details><summary class="note">저장된 표현 ${all.length}개 보기</summary><ul class="list" style="margin-top:8px">${all.map(c => `<li><div class="t"><b>${esc(c.expr)}</b><span>${esc(c.meaning)} · ${c.due <= Date.now() ? "오늘 복습" : `${md(new Date(c.due))} 복습`}</span></div><button class="btn small" data-act="delCard" data-id="${c.id}" aria-label="${esc(c.expr)} 삭제">삭제</button></li>`).join("")}</ul></details>` : ""}
+    </section>`;
+  }
+  function addCards(fb) {
+    let n = 0;
+    for (const x of fb.expressions || []) {
+      const k = x.expression.trim().toLowerCase();
+      if (!k || data.cards.some(c => c.expr.trim().toLowerCase() === k)) continue;
+      data.cards.push({ id: uid(), expr: x.expression.trim(), meaning: x.meaning, example: x.example, box: 0, due: addDays(new Date(), 1).setHours(0, 0, 0, 0), added: Date.now() });
+      n++;
+    }
+    return n;
+  }
+
+  /* report */
+  function weaknessCounts() {
+    const out = {};
+    const recent = Date.now() - 14 * 864e5;
+    for (const a of attempts()) {
+      for (const it of a.fb?.issues || []) {
+        if (it.type === "advanced") continue;
+        const c = out[it.category] ||= { n: 0, recent: 0, last: null };
+        c.n++;
+        if (a.ts >= recent) c.recent++;
+        if (!c.last || a.ts >= c.last.ts) c.last = { ts: a.ts, it };
+      }
+    }
+    return out;
+  }
+  function chartHtml() {
+    const weeks = weeklyWords(8), max = Math.max(50, ...weeks.map(w => w.words));
+    const W = 560, H = 160, top = 18, bottom = 22, gap = 10, bw = (W - gap * 7) / 8;
+    const bars = weeks.map((w, i) => {
+      const h = w.words ? Math.max(4, (w.words / max) * (H - top - bottom)) : 0, x = i * (bw + gap), y = H - bottom - h, cur = i === 7;
+      const path = h ? `M${x},${H - bottom} V${y + 4} q0,-4 4,-4 H${x + bw - 4} q4,0 4,4 V${H - bottom} Z` : "";
+      return `<g data-i="${i}">${path ? `<path class="bar ${cur ? "cur" : ""}" d="${path}"/>` : ""}
+        <rect class="hit" x="${x}" y="0" width="${bw}" height="${H}" tabindex="0" role="img" aria-label="${md(w.start)} 주: ${w.words}단어"/>
+        ${cur || w.words === max ? `<text class="v" x="${x + bw / 2}" y="${y - 5}" text-anchor="middle">${w.words}</text>` : ""}
+        <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${md(w.start)}</text></g>`;
+    }).join("");
+    const cur = weeks[7].words, prev = weeks[6].words;
+    return `<div class="chart" id="chart">
+      <div class="row between"><span class="label">주간 단어 수</span><span class="note">이번 주 <b>${cur}</b>단어${prev ? ` · 지난주 대비 ${cur >= prev ? "+" : ""}${cur - prev}` : ""}</span></div>
+      <svg viewBox="0 -4 ${W} ${H + 4}" aria-hidden="false" role="group" aria-label="최근 8주 주간 단어 수"><line class="base" x1="0" x2="${W}" y1="${H - bottom}" y2="${H - bottom}"/>${bars}</svg>
+      <p class="readout" id="readout">막대를 누르면 그 주의 단어 수를 보여 줘요.</p>
+      <table class="visually-hidden"><caption>주간 단어 수</caption><tr><th>주 시작</th><th>단어</th></tr>${weeks.map(w => `<tr><td>${md(w.start)}</td><td>${w.words}</td></tr>`).join("")}</table>
+    </div>`;
+  }
+  function reportView() {
+    const days = activeDays(), today = new Date();
+    const strip = Array.from({ length: 14 }, (_, i) => { const d = addDays(today, i - 13), k = dayKey(d); return `<i class="${days.has(k) ? "on" : ""} ${i === 13 ? "today" : ""}" title="${md(d)}${days.has(k) ? " 작성" : ""}"></i>`; }).join("");
+    const counts = Object.entries(weaknessCounts()).sort((a, b) => b[1].n - a[1].n);
+    const max = counts[0]?.[1].n || 1;
+    const all = attempts(), scored = all.filter(a => a.fb), avg = scored.length ? Math.round(scored.reduce((s, a) => s + a.fb.score, 0) / scored.length) : 0;
+    const reNum = data.entries.filter(e => (e.rewrites || []).length).length;
+    return `<section class="panel">
+      <span class="label">꾸준함</span>
+      <div class="stats"><div><b>${streak()}일</b><span>연속 작성</span></div><div><b>${all.length}</b><span>쓴 글</span></div><div><b>${reNum}</b><span>다시 써 본 글</span></div><div><b>${avg || "–"}</b><span>평균 점수</span></div></div>
+      <div><span class="note">최근 2주</span><div class="days" aria-label="최근 2주 작성한 날">${strip}</div></div>
+      ${chartHtml()}
+    </section>
+    <section class="panel" style="margin-top:16px">
+      <span class="label">내 약점 리포트</span>
+      ${counts.length ? `<p class="note">지금까지 받은 문법 오류·어색한 표현을 유형별로 모았어요. 위에 있을수록 자주 틀리는 패턴이에요.</p>
+      <ul class="weak">${counts.map(([k, v]) => `<li>
+        <div class="top"><b>${CATS[k] || k}</b><span>${v.n}회 · 최근 2주 ${v.recent}회</span></div>
+        <div class="track"><i style="width:${(v.n / max) * 100}%"></i></div>
+        <div class="ex">최근: <del>${esc(v.last.it.original)}</del> → <b>${esc(v.last.it.fix)}</b> — ${esc(v.last.it.why)}</div></li>`).join("")}</ul>`
+      : `<p class="empty">피드백을 받으면 관사·시제·전치사처럼 자주 틀리는 패턴이 여기에 쌓여요.</p>`}
+    </section>`;
+  }
+
+  /* ---------- actions ---------- */
+  let timer;
+  async function submit() {
+    if (busy) return;
+    const mode = tab, s = sessions[mode];
+    const text = s.text.trim();
+    if (!words(text)) return;
+    if (!apiKey.get()) { openKey(); return; }
+    const e = mode === "rewrite" ? data.entries.find(x => x.id === s.entryId) : null;
+    const realMode = e ? e.mode : mode, prompt = e ? e.prompt : s.prompt;
+    busy = mode; busyStart = Date.now(); error = "";
+    render();
+    timer = setInterval(() => { const el = $("#elapsed"); if (el) el.textContent = Math.round((Date.now() - busyStart) / 1000); }, 500);
+    try {
+      const prevIssues = e ? lastAttempt(e).fb.issues : null;
+      const fb = await askClaude(realMode, prompt, text, prevIssues);
+      fb.issues = (fb.issues || []).filter(it => it.original !== it.fix);
+      if (e) {
+        (e.rewrites ||= []).push({ text, fb, ts: Date.now() });
+      } else {
+        const entry = { id: uid(), mode, prompt, text, fb, ts: Date.now(), rewrites: [] };
+        data.entries.push(entry);
+        s.entryId = entry.id;
+      }
+      s.text = text; s.fb = fb; s.prevIssues = prevIssues; s.savedCards = addCards(fb);
+      save();
+    } catch (err) {
+      error = err.message === "NO_KEY" ? "API 키를 먼저 넣어 주세요." : (err.message || "피드백을 받지 못했어요.");
+    } finally {
+      clearInterval(timer); busy = null;
+      if (saveFailed) error = "기록을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.";
+      render();
+      if (tab === mode && sessions[mode].fb) $(".fb")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+  function startRewrite() {
+    const s = sessions[tab];
+    const id = s.entryId;
+    if (!id) return;
+    if (tab !== "rewrite") { sessions[tab] = { ...s, text: "", fb: null, entryId: null }; nextPrompt(tab); }
+    sessions.rewrite = { entryId: id, text: "", fb: null };
+    setTab("rewrite");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function nextPrompt(mode, level) {
+    const s = sessions[mode];
+    if (mode === "translate") { const lv = level || s.prompt.level || 1; s.prompt = pick(SENTENCES.filter(x => x.level === lv), s.prompt); }
+    else if (mode === "expand") s.prompt = { base: pick(BASES, s.prompt.base) };
+    else s.prompt = pick(TOPICS, s.prompt);
+    s.text = ""; s.fb = null; s.entryId = null; error = "";
+  }
+  function setTab(t) { tab = t; error = ""; store.set("write.tab", t); render(); }
+  function openKey() { $("#keyInput").value = apiKey.get(); $("#keyDlg").showModal(); }
+
+  document.addEventListener("click", ev => {
+    const t = ev.target.closest("[data-tab],[data-act]");
+    if (!t) return;
+    if (t.dataset.tab) return setTab(t.dataset.tab);
+    const act = t.dataset.act;
+    if (act === "submit") submit();
+    else if (act === "openKey") openKey();
+    else if (act === "newSentence") { nextPrompt("translate", +t.dataset.level); render(); }
+    else if (act === "newPrompt") { nextPrompt(tab); render(); }
+    else if (act === "next") { nextPrompt(tab); render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    else if (act === "startRewrite") startRewrite();
+    else if (act === "openRewrite") { sessions.rewrite = { entryId: t.dataset.id, text: "", fb: null }; error = ""; render(); window.scrollTo({ top: 0 }); }
+    else if (act === "rewriteDone") { sessions.rewrite = { entryId: null, text: "", fb: null }; render(); }
+    else if (act === "jump") { const el = document.getElementById("issue-" + t.dataset.i); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); } }
+    else if (act === "grade") {
+      const c = data.cards.find(x => x.id === review.id);
+      if (c) { c.box = t.dataset.ok === "1" ? Math.min(c.box + 1, CARD_STEPS.length - 1) : 0; c.due = c.box ? addDays(new Date(), CARD_STEPS[c.box]).setHours(0, 0, 0, 0) : Date.now() + 10 * 60e3; save(); }
+      review = { id: null, shown: false, guess: "" }; render();
+    }
+    else if (act === "delCard") { data.cards = data.cards.filter(c => c.id !== t.dataset.id); save(); render(); }
+  });
+  document.addEventListener("submit", ev => {
+    const f = ev.target.dataset.form;
+    if (!f) return;
+    ev.preventDefault();
+    if (f === "custom") {
+      const ko = $("#customKo").value.trim();
+      if (!ko) return;
+      Object.assign(sessions.translate, { prompt: { ko }, text: "", fb: null, entryId: null });
+      render();
+    } else if (f === "reveal") { review.shown = true; review.guess = $("#guess").value.trim(); render(); }
+  });
+  document.addEventListener("input", ev => {
+    if (ev.target.id !== "draft") return;
+    const s = sessions[tab];
+    s.text = ev.target.value;
+    const e = tab === "rewrite" ? data.entries.find(x => x.id === s.entryId) : null;
+    const meter = ev.target.parentElement.querySelector(".meter");
+    if (meter) meter.outerHTML = meterHtml(e ? e.mode : tab, s.text, e ? e.prompt : s.prompt);
+    const btn = ev.target.parentElement.querySelector('[data-act="submit"]');
+    if (btn) btn.disabled = !words(s.text);
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.target.id === "draft" && ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); submit(); }
+    if (ev.target.classList?.contains("hit") && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); showWeek(ev.target); }
+    if (ev.target.classList?.contains("mk") && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); ev.target.click(); }
+  });
+  // Chart readout: hover on desktop, tap on phones, focus for keyboard.
+  const showWeek = el => {
+    const g = el.closest("g[data-i]"); if (!g) return;
+    const w = weeklyWords(8)[+g.dataset.i];
+    document.querySelectorAll("#chart .bar").forEach(b => b.classList.toggle("on", b.closest("g") === g));
+    const r = $("#readout"); if (r) r.innerHTML = `${md(w.start)} – ${md(addDays(w.start, 6))} · <b>${w.words}</b>단어`;
+  };
+  document.addEventListener("pointerover", ev => { if (ev.target.classList?.contains("hit")) showWeek(ev.target); });
+  document.addEventListener("focusin", ev => { if (ev.target.classList?.contains("hit")) showWeek(ev.target); });
+  document.addEventListener("click", ev => { if (ev.target.classList?.contains("hit")) showWeek(ev.target); });
+
+  $("#keyBtn").addEventListener("click", openKey);
+  $("#keyClear").addEventListener("click", () => { apiKey.set(""); $("#keyInput").value = ""; $("#keyDlg").close(); render(); });
+  $("#keyForm").addEventListener("submit", ev => {
+    if (ev.submitter?.value === "save") { apiKey.set($("#keyInput").value.trim()); error = ""; }
+    setTimeout(render);
+  });
+
+  render();
+</script>
+</body>
+</html>
