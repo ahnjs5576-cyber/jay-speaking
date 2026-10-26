@@ -129,6 +129,11 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-col
 .meter { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .meter b { color: var(--fg); font-weight: 500; }
 .meter .ok { color: var(--good); }
+.btn.mic.on { background: var(--bad); border-color: var(--bad); color: #fff; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--bad) 45%, transparent); } 50% { box-shadow: 0 0 0 8px transparent; } }
+.mic-status { font-size: 0.84rem; color: var(--muted); margin: 0; }
+.mic-status.err { color: var(--bad); }
+.voice-tag { font-size: 0.72rem; color: var(--muted); }
 .rewrite-note { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 14px; font-size: 0.9rem; }
 
 /* feedback */
@@ -190,7 +195,7 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-col
 .loading { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 0.9rem; }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .issue.flash, .spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .issue.flash, .spinner, .btn.mic.on { animation: none; } }
 
 /* lists */
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -646,7 +651,7 @@ Rules for the JSON you return:
   });
   const SHAPE = `{"score": 0-100, "verdict": "...", "praise": "...", "issues": [{"original": "...", "fix": "...", "type": "${Object.keys(TYPE_LABEL).join("|")}", "category": "${Object.keys(CATS).join("|")}", "why": "..."}], "corrected": "...", "model_answers": [{"text": "...", "note": "..."}], "expressions": [{"expression": "...", "meaning": "...", "example": "..."}], "resolved_previous": [0]}`;
 
-  function taskText(mode, p, text, prev, level) {
+  function taskText(mode, p, text, prev, level, voice) {
     let s;
     if (p.revise) {
       s = `Task: revise a short English paragraph. It was written to contain problems with ${CAT_EN[p.focus]}.\nOriginal paragraph:\n${p.revise}\n\nLearner's revision:\n${text}\n\nScore how well the revision fixes those problems while staying correct, natural and faithful to the meaning. issues refer to the learner's revision. In verdict, say which problems they fixed and which remain. model_answers: 2 strong revisions with different approaches.`;
@@ -663,6 +668,7 @@ Rules for the JSON you return:
     const weak = topWeakCats();
     s = `Learner's target level: ${LEVEL_BAR[level]}\nGrade against this level: the score says how close the writing is to what a strong writer at this level would produce, so being merely correct is not enough for 90+, while an acceptable, natural answer at this level scores 85 or more. Use "advanced" items to show the next step up from this level.` +
       (weak.length ? `\nThis learner's most frequent error types so far: ${weak.map(k => CAT_EN[k]).join("; ")}. Check these carefully.` : "") + `\n\n` + s;
+    if (voice) s += `\n\nSome of this text was dictated with speech recognition. Do not flag capitalization or punctuation. If a word looks like a recognition mix-up (a homophone or a similar-sounding word) rather than a grammar choice, still correct it but say in why that it may be a voice-input error.`;
     if (prev) {
       s += `\n\nThis is a REWRITE: the learner wrote the task again from memory without looking at the earlier feedback. Earlier issues (index: original → fix):\n` +
         prev.issues.map((x, i) => `${i}: "${x.original}" → "${x.fix}"`).join("\n") +
@@ -751,8 +757,8 @@ Rules for the JSON you return:
       resolved_previous: arr(r.resolved_previous).map(Number).filter(Number.isInteger)
     };
   }
-  async function askFeedback(mode, p, text, prev, level) {
-    return normalize(await callClaude({ system: SYSTEM, user: taskText(mode, p, text, prev, level), schema: SCHEMA, shape: SHAPE, effort: "medium" }));
+  async function askFeedback(mode, p, text, prev, level, voice) {
+    return normalize(await callClaude({ system: SYSTEM, user: taskText(mode, p, text, prev, level, voice), schema: SCHEMA, shape: SHAPE, effort: "medium" }));
   }
 
   // New practice items written by Claude: when the built-in set runs out, or to drill one error pattern.
@@ -887,7 +893,7 @@ Rules for the JSON you return:
     if (s.prompt.repeat && !s.fb) tools += `<p class="note">준비된 문제를 모두 풀었어요. 'AI 새 문제'로 새 문제를 받을 수 있어요.</p>`;
     if (mode === "translate" && !s.fb && !busy && !s.prompt.focus) tools += `
       <form class="row custom" data-form="custom"><label class="visually-hidden" for="customKo">직접 넣을 한국어 문장</label>
-        <input id="customKo" placeholder="연습하고 싶은 한국어 문장을 직접 넣어도 돼요"><button class="btn small">이 문장으로</button></form>`;
+        <input id="customKo" placeholder="연습하고 싶은 한국어 문장을 직접 넣어도 돼요">${micBtn("customKo", "ko-KR", "", false, true)}<button class="btn small">이 문장으로</button></form>${micStatus("customKo")}`;
     if (mode === "expand" && !s.fb) tools += `<p class="hints"><b>써 볼 구조</b> · ${EXPAND_GUIDE[promptLevel(s.prompt)].chips.map(esc).join(" · ")}</p>`;
     return `<section class="panel">${head}${promptHtml(mode, s.prompt)}${tools}${editorHtml(mode, s, s.prompt)}${s.fb ? feedbackHtml(s, { mode }) : ""}</section>`;
   }
@@ -899,17 +905,18 @@ Rules for the JSON you return:
       ${weak ? `<button class="chip ai" data-act="drill" data-cat="${weak}" ${busy || drillBusy ? "disabled" : ""} title="자주 틀리는 패턴을 담은 문제 3개로 집중 연습해요">${drillBusy === weak ? "만드는 중…" : `약점 집중: ${CATS[weak]}`}</button>` : ""}</div>`;
   }
   function editorHtml(mode, s, p) {
-    if (s.fb) return `<div class="box"><span class="label">${s.isRewrite ? "다시 쓴 글" : "내가 쓴 글"}</span>${markedHtml(s.text, s.fb.issues)}<div class="legend"><span class="grammar">문법 오류</span><span class="awkward">어색한 표현</span><span class="advanced">더 고급 표현</span></div></div>`;
+    if (s.fb) return `<div class="box"><span class="label">${s.isRewrite ? "다시 쓴 글" : "내가 쓴 글"}${s.voiced ? ` <span class="voice-tag">· 🎤 음성 입력 포함</span>` : ""}</span>${markedHtml(s.text, s.fb.issues)}<div class="legend"><span class="grammar">문법 오류</span><span class="awkward">어색한 표현</span><span class="advanced">더 고급 표현</span></div></div>`;
     const loading = !!pending[tab], locked = loading || !!s.gen || (tab === "translate" && !!drillBusy);
     const [lo, hi] = DIARY_RANGE[promptLevel(p)];
     return `
       <label class="visually-hidden" for="draft">영어로 쓰기</label>
       <textarea id="draft" spellcheck="false" autocapitalize="sentences" placeholder="${mode === "diary" ? `Write ${lo}-${hi} sentences in English...` : "Write in English..."}" ${locked ? "disabled" : ""}>${esc(s.text)}</textarea>
       <div class="row between">${meterHtml(mode, s.text, p)}
-        <button class="btn primary" data-act="submit" ${locked || !words(s.text) ? "disabled" : ""}>${loading ? "피드백 받는 중…" : "피드백 받기"}</button></div>
+        <div class="row">${micBtn("draft", "en-US", "말하기", locked)}<button class="btn primary" data-act="submit" ${locked || !words(s.text) ? "disabled" : ""}>${loading ? "피드백 받는 중…" : "피드백 받기"}</button></div></div>
+      ${micStatus("draft")}
       ${loading ? `<div class="loading" role="status"><span class="spinner"></span><span>글을 꼼꼼히 읽고 있어요 · <span class="elapsed" data-for="${tab}">${Math.round((Date.now() - pending[tab]) / 1000)}</span>초</span></div>` : ""}
       ${s.error && !loading ? `<div class="banner bad" role="alert">${esc(s.error)}</div>` : ""}
-      <p class="note">Ctrl(⌘) + Enter로도 보낼 수 있어요.</p>`;
+      <p class="note">Ctrl(⌘) + Enter로도 보낼 수 있어요.${canDictate ? " 🎤 말하기로 영어를 말하면 글로 들어가요." : ""}</p>`;
   }
 
   // Wrap each issue's span in the learner's text, matching whole words so "a" never lands inside "Yesterday".
@@ -1006,7 +1013,7 @@ Rules for the JSON you return:
     const asked = (it.qa || []).map(x => `<p class="q">Q. ${esc(x.q)}</p><p>${esc(x.a)}</p>`).join("");
     const open = s.askOpen === i, busy = s.asking === i;
     const form = open ? `<form class="ask" data-form="ask" data-i="${i}"><label class="visually-hidden" for="ask-${i}">이 고침에 대한 질문</label>
-        <input id="ask-${i}" autocomplete="off" placeholder="예: 왜 the가 아니라 a예요?" ${busy ? "disabled" : ""}><button class="btn small primary" ${busy ? "disabled" : ""}>${busy ? "답 받는 중…" : "묻기"}</button></form>
+        <input id="ask-${i}" autocomplete="off" placeholder="예: 왜 the가 아니라 a예요?" ${busy ? "disabled" : ""}>${micBtn(`ask-${i}`, "ko-KR", "", busy, true)}<button class="btn small primary" ${busy ? "disabled" : ""}>${busy ? "답 받는 중…" : "묻기"}</button></form>${micStatus(`ask-${i}`)}
         ${s.askError && open ? `<p class="why" role="alert">${esc(s.askError)}</p>` : ""}`
       : `<div><button class="linkbtn" type="button" data-act="ask" data-i="${i}">이 고침에 대해 질문하기</button></div>`;
     return `${asked ? `<div class="qa">${asked}</div>` : ""}${form}`;
@@ -1072,7 +1079,7 @@ Rules for the JSON you return:
             : `<button class="btn" data-act="grade" data-ok="0">몰랐어요</button><button class="btn primary" data-act="grade" data-ok="1">알았어요</button>`;
         back = `${res}${answer}<div class="row">${grade}</div>`;
       } else {
-        back = `<form class="row" data-form="reveal" style="flex-wrap:nowrap"><label class="visually-hidden" for="guess">답</label><input id="guess" autocomplete="off" spellcheck="false" placeholder="${card.kind === "fix" ? "고친 표현을 써 보세요" : "떠오르는 표현을 써 보세요"} (비워도 돼요)"><button class="btn primary">확인</button></form>`;
+        back = `<form class="row" data-form="reveal" style="flex-wrap:nowrap"><label class="visually-hidden" for="guess">답</label><input id="guess" autocomplete="off" spellcheck="false" placeholder="${card.kind === "fix" ? "고친 표현을 써 보세요" : "떠오르는 표현을 써 보세요"} (비워도 돼요)">${micBtn("guess", "en-US", "", false, true)}<button class="btn primary">확인</button></form>${micStatus("guess")}`;
       }
       body = `<div class="card">${front}${back}</div>`;
     } else {
@@ -1186,11 +1193,125 @@ Rules for the JSON you return:
     </section>`;
   }
 
+  /* ---------- voice input ---------- */
+  // Dictation through the browser's speech recognition: words go in at the caret as they are recognised.
+  // claude.ai artifact frames refuse the microphone, so the buttons only appear on the standalone page.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  const IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  const canDictate = !!SR && !inClaude;
+  let dict = null, micMsg = null; // the running dictation; the last message per field {id, text, err}
+  function micBtn(id, lang, label, disabled, compact) {
+    if (!canDictate) return "";
+    const on = dict?.id === id;
+    return `<button type="button" class="btn ${compact ? "small" : ""} mic ${on ? "on" : ""}" data-act="mic" data-for="${id}" data-lang="${lang}" aria-pressed="${on}"
+      aria-label="${on ? "음성 입력 멈추기" : lang === "ko-KR" ? "한국어로 말해서 입력" : "영어로 말해서 입력"}" ${disabled && !on ? "disabled" : ""}>${on ? "■ 멈추기" : `🎤${label ? " " + label : ""}`}</button>`;
+  }
+  function micStatus(id) {
+    if (dict?.id === id) return `<p class="mic-status" role="status">${dict.lang === "en-US" ? "영어로 말해 보세요. 마침표는 “period”, 쉼표는 “comma”, 물음표는 “question mark”, 줄바꿈은 “new line”." : "한국어로 말해 보세요."} 다 말하면 ■ 멈추기를 누르세요.</p>`;
+    if (micMsg?.id === id) return `<p class="mic-status ${micMsg.err ? "err" : ""}" role="${micMsg.err ? "alert" : "status"}">${esc(micMsg.text)}</p>`;
+    return "";
+  }
+  // Spoken punctuation and sentence capitals; Korean only gets the punctuation words.
+  function spoken(t, lang, startOfSentence) {
+    let x = " " + t + " ";
+    const marks = lang === "en-US"
+      ? [[/\s+(full stop|period)\b/gi, "."], [/\s+comma\b/gi, ","], [/\s+question mark\b/gi, "?"], [/\s+exclamation (mark|point)\b/gi, "!"], [/\s*\bnew (line|paragraph)\b\s*/gi, "\n"]]
+      : [[/\s*마침표/g, "."], [/\s*쉼표/g, ","], [/\s*물음표/g, "?"], [/\s*느낌표/g, "!"]];
+    for (const [re, m] of marks) x = x.replace(re, m);
+    x = x.replace(/[ \t]+/g, " ").replace(/ +([.,?!])/g, "$1").trim();
+    if (lang === "en-US") {
+      x = x.replace(/\bi\b/g, "I").replace(/([.?!]\s+|\n)([a-z])/g, (_, a, b) => a + b.toUpperCase());
+      if (startOfSentence) x = x.replace(/^[a-z]/, c => c.toUpperCase());
+    }
+    return x;
+  }
+  function writeDictation(d) {
+    const el = document.getElementById(d.id);
+    const heard = spoken(`${d.finals} ${d.interim}`.trim(), d.lang, /(^|[.?!]\s*|\n\s*)$/.test(d.before));
+    if (!heard) return;
+    const pre = d.before && !/\s$/.test(d.before) && !/^[.,?!]/.test(heard) ? d.before + " " : d.before;
+    const post = d.after && !/^\s/.test(d.after) ? " " + d.after : d.after;
+    const value = pre + heard + post;
+    if (d.id === "draft") {
+      const ss = sessions[d.tab];
+      ss.text = value; ss.voice = true;
+    }
+    if (!el) return;
+    el.value = value;
+    const caret = (pre + heard).length;
+    try { el.setSelectionRange(caret, caret); } catch {}
+    if (d.id === "draft") el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  const MIC_ERRORS = {
+    "not-allowed": IOS ? "마이크 권한이 꺼져 있어요. 아이폰 설정 → 앱 → Safari → 마이크를 허용하고, 설정 → Siri에서 받아쓰기를 켠 뒤 새로고침해 주세요."
+      : "마이크 권한이 거부됐어요. 주소창 왼쪽 아이콘에서 마이크를 허용한 뒤 다시 눌러 주세요.",
+    "service-not-allowed": IOS ? "음성 인식을 쓸 수 없어요. 설정 → Siri에서 받아쓰기를 켜고, 사파리에서 열었는지 확인해 주세요." : "이 브라우저에서는 음성 인식을 쓸 수 없어요. 크롬이나 엣지에서 열어 주세요.",
+    "audio-capture": "마이크를 찾을 수 없어요. 마이크가 연결돼 있는지 확인해 주세요.",
+    "network": "음성 인식 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.",
+    "no-speech": "소리가 들리지 않았어요. 마이크 가까이에서 다시 말해 보세요."
+  };
+  function startDictation(id, lang) {
+    stopDictation();
+    const el = document.getElementById(id);
+    if (!el || el.disabled) return;
+    const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? a;
+    const d = dict = { id, lang, tab, before: el.value.slice(0, a), after: el.value.slice(b), finals: "", interim: "", heard: false, error: null, timer: null, rec: null };
+    micMsg = null;
+    // Stop after 10 s of silence, so a forgotten mic does not keep listening.
+    const arm = () => { clearTimeout(d.timer); d.timer = setTimeout(() => stopDictation(), 10000); };
+    const begin = () => {
+      const r = d.rec = new SR();
+      r.lang = lang; r.interimResults = true; r.continuous = !MOBILE; r.maxAlternatives = 1;
+      r.onresult = ev => {
+        if (dict !== d) return;
+        let interim = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const res = ev.results[i];
+          if (res.isFinal) d.finals = `${d.finals} ${res[0].transcript}`.trim(); else interim += res[0].transcript;
+        }
+        d.interim = interim; d.heard = true;
+        writeDictation(d); arm();
+      };
+      r.onerror = ev => {
+        if (dict !== d || ev.error === "aborted" || (ev.error === "no-speech" && d.heard)) return;
+        d.error = MIC_ERRORS[ev.error] || `음성 인식 오류가 났어요 (${ev.error}). 다시 눌러 주세요.`;
+      };
+      // Phones stop after each phrase; keep listening until the learner presses stop or goes quiet.
+      r.onend = () => {
+        if (dict !== d) return;
+        if (!d.error) { try { begin(); return; } catch {} }
+        finishDictation(d);
+      };
+      r.start();
+    };
+    try { begin(); } catch { d.error = "음성 인식을 시작하지 못했어요. 페이지를 새로고침해 주세요."; finishDictation(d); return; }
+    arm();
+    render();
+  }
+  function finishDictation(d) {
+    if (dict !== d) return;
+    dict = null;
+    clearTimeout(d.timer);
+    d.finals = `${d.finals} ${d.interim}`.trim(); d.interim = "";
+    writeDictation(d);
+    micMsg = d.error ? { id: d.id, text: d.error, err: true } : d.heard ? null : { id: d.id, text: MIC_ERRORS["no-speech"], err: true };
+    if (d.id === "draft" && sessions[d.tab]) saveDrafts();
+    render();
+  }
+  function stopDictation() {
+    const d = dict;
+    if (!d) return;
+    try { d.rec?.abort(); } catch {}
+    finishDictation(d);
+  }
+
   /* ---------- actions ---------- */
   setInterval(() => document.querySelectorAll(".elapsed").forEach(el => { const t = pending[el.dataset.for]; if (t) el.textContent = Math.round((Date.now() - t) / 1000); }), 500);
   async function submit() {
     const mode = tab, s = sessions[mode];
     if (pending[mode] || s.gen || s.fb) return;
+    if (dict?.id === "draft") stopDictation();
     const text = s.text.trim();
     if (!words(text)) return;
     const e = mode === "rewrite" ? data.entries.find(x => x.id === s.entryId) : null;
@@ -1210,23 +1331,24 @@ Rules for the JSON you return:
     try {
       const last = e ? lastAttempt(e) : null;
       const prev = last ? { issues: last.fb.issues, text: last.text, score: last.fb.score } : null;
-      const fb = await askFeedback(realMode, prompt, text, prev, level);
+      const voice = !!s.voice;
+      const fb = await askFeedback(realMode, prompt, text, prev, level, voice);
       const now = Date.now();
       s.levelChange = null;
       let changed;
       if (e) {
-        (e.rewrites ||= []).push({ text, fb, ts: now });
+        (e.rewrites ||= []).push({ text, fb, ts: now, ...(voice ? { voice } : {}) });
         e.rewriteDue = hasErrors(fb) ? startOfDay(now, 3) : null;
         changed = e;
       } else {
-        const entry = { id: uid(), mode, level, prompt, text, fb, ts: now, rewrites: [], rewriteDue: hasErrors(fb) ? startOfDay(now, 1) : null };
+        const entry = { id: uid(), mode, level, prompt, text, fb, ts: now, rewrites: [], rewriteDue: hasErrors(fb) ? startOfDay(now, 1) : null, ...(voice ? { voice } : {}) };
         data.entries.push(entry);
         s.entryId = entry.id;
         changed = entry;
         if (prompt.level === lvl(mode) && !prompt.revise) s.levelChange = adjustLevel(mode);
         if (prompt.focus && s.drill?.cat === prompt.focus) (s.drill.results ||= []).push({ score: fb.score, errs: fb.issues.filter(x => x.type !== "advanced" && x.category === prompt.focus).length });
       }
-      Object.assign(s, { text, fb, prev, fbTs: now, isRewrite: !!e, saved: addCards(fb, text), askOpen: null, asking: null, askError: "" });
+      Object.assign(s, { text, fb, prev, fbTs: now, voice: false, voiced: voice, isRewrite: !!e, saved: addCards(fb, text), askOpen: null, asking: null, askError: "" });
       save(changed);
       if (saveFailed) s.error = "기록을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.";
     } catch (err) {
@@ -1254,7 +1376,8 @@ Rules for the JSON you return:
     const s = sessions[mode];
     if (s.queue?.length) s.prompt = s.queue.shift();
     else { s.prompt = freshPrompt(mode, s.prompt); s.drill = null; }
-    Object.assign(s, { text: s.prompt.revise || "", fb: null, entryId: null, error: "", levelChange: null, saved: null });
+    if (dict?.id === "draft" && dict.tab === mode) stopDictation();
+    Object.assign(s, { text: s.prompt.revise || "", fb: null, entryId: null, error: "", levelChange: null, saved: null, voice: false });
   }
   async function aiPrompt(mode) {
     const s = sessions[mode];
@@ -1320,7 +1443,7 @@ Rules for the JSON you return:
     render();
     $("#guess")?.focus();
   }
-  function setTab(t) { tab = t; store.set("write.tab", t); render(); }
+  function setTab(t) { stopDictation(); micMsg = null; tab = t; store.set("write.tab", t); render(); }
   function openKey() { $("#keyInput").value = apiKey.get(); $("#keyDlg").showModal(); }
 
   document.addEventListener("click", ev => {
@@ -1330,6 +1453,7 @@ Rules for the JSON you return:
     if (t.dataset.week) return showWeek(t);
     const act = t.dataset.act;
     if (act === "submit") submit();
+    else if (act === "mic") { if (dict?.id === t.dataset.for) stopDictation(); else startDictation(t.dataset.for, t.dataset.lang); }
     else if (act === "openKey") openKey();
     else if (act === "closeIntro") { store.set("write.intro", 1); render(); }
     else if (act === "newPrompt") { if (!pending[tab]) { nextPrompt(tab); render(); } }
@@ -1350,6 +1474,7 @@ Rules for the JSON you return:
     const f = ev.target.dataset.form;
     if (!f) return;
     ev.preventDefault();
+    if (dict) stopDictation();
     if (f === "custom") {
       const ko = $("#customKo").value.trim();
       if (!ko || pending.translate) return;
