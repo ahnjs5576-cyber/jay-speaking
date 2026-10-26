@@ -134,7 +134,8 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-col
 /* feedback */
 .fb { display: grid; gap: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
 .scoreline { display: flex; gap: 14px; align-items: center; }
-.score { font-family: var(--display); font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.score { font-family: var(--display); font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; flex: none; white-space: nowrap; }
+.scoreline > div:last-child { min-width: 0; }
 .score small { font-size: 0.9rem; color: var(--muted); font-weight: 500; }
 .verdict { margin: 0; }
 .praise { margin: 0; color: var(--good); font-size: 0.9rem; }
@@ -165,6 +166,12 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-col
 .change del { color: var(--muted); }
 .change ins { text-decoration: none; font-weight: 600; }
 .why { margin: 0; font-size: 0.9rem; color: var(--muted); }
+.qa { display: grid; gap: 6px; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; }
+.qa p { margin: 0; font-size: 0.9rem; }
+.qa .q { color: var(--muted); }
+.ask { display: flex; gap: 6px; }
+.ask input { flex: 1; min-width: 0; min-height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); padding: 6px 10px; }
+.prompt.para { font-family: var(--body); font-size: 1.05rem; line-height: 1.7; font-weight: 400; background: var(--bg); border-radius: 12px; padding: 12px 14px; text-wrap: pretty; }
 .box { background: var(--bg); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
 .box p { margin: 0; }
 .en { font-size: 1.02rem; overflow-wrap: anywhere; }
@@ -419,7 +426,11 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
   // Pass the entry that changed so it can be written to the viewer's account too.
   function save(changed) {
     if (changed) changed.updated = Date.now();
-    if (data.entries.length > 400) data.entries = data.entries.slice(-400);
+    // Keep local storage bounded by dropping the oldest finished entries; anything still due for a rewrite stays.
+    for (let i = 0; data.entries.length > 400 && i < data.entries.length;) {
+      const e = data.entries[i];
+      if (e.rewriteDue || e === changed) i++; else data.entries.splice(i, 1);
+    }
     if (data.deleted.length > 500) data.deleted = data.deleted.slice(-500);
     saveFailed = !store.set(DATA_KEY, data);
     if (cloud.ref) push(changed ? [changed] : []);
@@ -487,7 +498,7 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
   const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
   const weekStart = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
   const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
-  const promptKey = p => p?.ko || p?.base || p?.topic || "";
+  const promptKey = p => p?.ko || p?.revise || p?.base || p?.topic || "";
   const promptLevel = p => LEVELS.includes(p?.level) ? p.level : "B2";
   const lvl = mode => data.levels[mode].level;
   const todayTopic = () => { const list = TOPICS[lvl("diary")]; const [topic, en] = list[Math.floor(startOfDay(Date.now()) / DAY) % list.length]; return { topic, en, level: lvl("diary") }; };
@@ -505,7 +516,7 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
   // After each first draft: three in a row averaging UP_AT+ moves up a level, two averaging under DOWN_AT moves down.
   function levelScores(mode) {
     const st = data.levels[mode];
-    return data.entries.filter(e => e.mode === mode && e.level === st.level && e.ts >= st.since).map(e => e.fb.score);
+    return data.entries.filter(e => e.mode === mode && e.level === st.level && e.ts >= st.since && !e.prompt?.revise).map(e => e.fb.score);
   }
   function adjustLevel(mode) {
     const st = data.levels[mode], scores = levelScores(mode);
@@ -555,16 +566,18 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
     return weeks;
   }
   // Error counts per category, with a rate per 100 words for the last two weeks and the two weeks before.
-  function weakness() {
+  function weakness(before = Infinity) {
     const now = Date.now(), W = 14 * DAY, cats = {};
     let wRecent = 0, wPrev = 0;
     for (const a of attempts()) {
+      if (a.ts >= before) continue;
       const age = now - a.ts, bucket = age < W ? "recent" : age < 2 * W ? "prev" : null, w = words(a.text);
       if (bucket === "recent") wRecent += w; else if (bucket === "prev") wPrev += w;
       for (const it of a.fb?.issues || []) {
         if (it.type === "advanced") continue;
-        const c = cats[it.category] ||= { n: 0, recent: 0, prev: 0, last: null };
+        const c = cats[it.category] ||= { n: 0, recent: 0, prev: 0, last: null, entries: new Set() };
         c.n++;
+        c.entries.add(a.e.id);
         if (bucket) c[bucket]++;
         if (!c.last || a.ts >= c.last.ts) c.last = { ts: a.ts, it };
       }
@@ -576,7 +589,9 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
     const sorted = Object.entries(cats).sort((a, b) => b[1].recent - a[1].recent || b[1].n - a[1].n);
     return { sorted, wRecent };
   }
-  const topWeakCats = () => weakness().sorted.filter(([k, v]) => k !== "other" && (v.recent >= 2 || v.n >= 3)).slice(0, 3).map(([k]) => k);
+  // Categories that went wrong in at least two different pieces of writing (before a given moment, for the "자주 틀림" tag).
+  const topWeakCats = (before) => weakness(before).sorted.filter(([k, v]) => k !== "other" && v.entries.size >= 2).slice(0, 3).map(([k]) => k);
+  const REVISE_CATS = ["cohesion", "register", "concision"];
   const dueCards = () => data.cards.filter(c => c.due <= Date.now());
   const rewriteDue = () => data.entries.filter(e => e.rewriteDue && e.rewriteDue <= Date.now()).sort((a, b) => a.rewriteDue - b.rewriteDue);
   const rewriteLater = () => data.entries.filter(e => e.rewriteDue && e.rewriteDue > Date.now()).sort((a, b) => a.rewriteDue - b.rewriteDue);
@@ -631,7 +646,9 @@ Rules for the JSON you return:
 
   function taskText(mode, p, text, prev, level) {
     let s;
-    if (mode === "translate") {
+    if (p.revise) {
+      s = `Task: revise a short English paragraph. It was written to contain problems with ${CAT_EN[p.focus]}.\nOriginal paragraph:\n${p.revise}\n\nLearner's revision:\n${text}\n\nScore how well the revision fixes those problems while staying correct, natural and faithful to the meaning. issues refer to the learner's revision. In verdict, say which problems they fixed and which remain. model_answers: 2 strong revisions with different approaches.`;
+    } else if (mode === "translate") {
       s = `Task: translate a Korean sentence into English.\nKorean: ${p.ko}\n\nLearner's translation:\n${text}\n\nScore meaning accuracy first, then grammar and naturalness. model_answers: 3 or 4 natural translations that differ in wording or register (casual / neutral / formal), showing how a strong ${level} writer would phrase it. If the learner's translation is already fine, say so clearly in verdict.`;
       if (p.focus) s += `\nThis sentence was written to practise ${CAT_EN[p.focus]}. Check that point especially and explain it clearly.`;
     } else if (mode === "expand") {
@@ -740,13 +757,23 @@ Rules for the JSON you return:
   const GEN_SYSTEM = "You write practice material for Korean adults learning to write in English. Reply only with the JSON requested.";
   const GEN_SCHEMA = obj({ items: { type: "array", items: obj({ text: str, en: str }) } });
   const GEN_SHAPE = `{"items": [{"text": "...", "en": "..."}]}`;
+  // Extra guidance so drills for these patterns really force the learner to make the choice.
+  const DRILL_HINT = {
+    article: "The English translation must hinge on choosing a/an, the or no article (first vs second mention, generic vs specific, unique things, singular countable nouns), and the Korean must not give the answer away.",
+    tense: "The English translation must hinge on tense and aspect choices (present perfect vs past, past perfect, continuous, future in the past), with time clues in the Korean.",
+    preposition: "The English translation must need prepositions that Korean particles do not map onto one-to-one (in/on/at, for/during, by/until, dependent prepositions).",
+    countability: "The English translation must use uncountable or tricky nouns (advice, information, equipment, feedback, furniture) and their quantifiers.",
+    verb_pattern: "The English translation must need verb patterns such as stop/remember/try + to-infinitive vs -ing, make/let/have + object + verb, suggest/recommend + that-clause."
+  };
   async function generate(mode, { focus = null, n = 3 } = {}) {
     const level = lvl(mode);
     const avoid = data.entries.filter(e => e.mode === mode).slice(-12).map(e => promptKey(e.prompt)).join(" / ");
     let user;
-    if (mode === "translate") {
+    if (mode === "translate" && REVISE_CATS.includes(focus)) {
+      user = `Write ${n} short English paragraphs of 3 or 4 sentences (one per item, in "text"; "en" is "") on everyday work or life topics, each written as a CEFR ${level} learner might, with several clear problems in ${CAT_EN[focus]} but otherwise mostly correct. The learner will revise them, so do not mark or explain the problems.`;
+    } else if (mode === "translate") {
       user = `Write ${n} natural Korean sentences (one per item, in "text"; "en" is "") for a Korean adult to translate into English at CEFR ${level}. ` +
-        (focus ? `Each sentence must naturally require correct use of ${CAT_EN[focus]}, which this learner often gets wrong, in a different way each time. ` : "Vary the grammar and the topic (work, daily life, relationships, opinions, society). ") +
+        (focus ? `Each sentence must naturally require correct use of ${CAT_EN[focus]}, which this learner often gets wrong, in a different way each time. ${DRILL_HINT[focus] || ""} ` : "Vary the grammar and the topic (work, daily life, relationships, opinions, society). ") +
         `Make them sound like something a Korean adult would really say or write, 1 sentence each, level-appropriate.`;
     } else if (mode === "expand") {
       user = `Write ${n} short, plain English base sentences of 3 to 7 words (in "text"; "en" is "") that a CEFR ${level} learner can expand with ${EXPAND_GUIDE[level].focus}. Use varied subjects and situations.`;
@@ -757,7 +784,8 @@ Rules for the JSON you return:
     const r = await callClaude({ system: GEN_SYSTEM, user, schema: GEN_SCHEMA, shape: GEN_SHAPE, effort: "low" });
     const items = (Array.isArray(r?.items) ? r.items : []).filter(x => typeof x?.text === "string" && x.text.trim()).slice(0, n);
     if (!items.length) throw new UserError("새 문제를 만들지 못했어요. 다시 시도해 주세요.");
-    return items.map(x => mode === "translate" ? { ko: x.text.trim(), level, focus, ai: true }
+    return items.map(x => mode === "translate" && REVISE_CATS.includes(focus) ? { revise: x.text.trim(), level, focus, ai: true }
+      : mode === "translate" ? { ko: x.text.trim(), level, focus, ai: true }
       : mode === "expand" ? { base: x.text.trim(), level, ai: true }
       : { topic: x.text.trim(), en: String(x.en || "").trim(), level, ai: true });
   }
@@ -781,7 +809,7 @@ Rules for the JSON you return:
   if (sessions.rewrite.entryId && !data.entries.some(e => e.id === sessions.rewrite.entryId)) sessions.rewrite = { entryId: null, text: "", fb: null };
   const pending = {}; // tab → start time of a feedback request in flight
   let review = { id: null, shown: false, guess: "", result: null };
-  let reportMsg = "", drillBusy = null;
+  let reportMsg = "", drillBusy = null, showAllPast = false;
   function saveDrafts() {
     const d = {};
     for (const m of Object.keys(MODES)) { const s = sessions[m]; if (!s.fb) d[m] = { prompt: s.prompt, text: s.text, queue: s.queue, drill: s.drill }; }
@@ -831,6 +859,7 @@ Rules for the JSON you return:
 
   function promptHtml(mode, p) {
     const lv = promptLevel(p);
+    if (p.revise) return `<p class="note">아래 글을 ${esc(CATS[p.focus])}에 신경 써서 ${lv} 수준으로 고쳐 써 보세요. 입력 칸에 원문이 들어 있어요.</p><p class="prompt para">${esc(p.revise)}</p>`;
     if (mode === "translate") return `<p class="prompt">${esc(p.ko)}<small>${lv} 수준의 자연스러운 영어로 옮겨 보세요.</small></p>`;
     if (mode === "expand") return `<p class="prompt">${esc(p.base)}<small>${EXPAND_GUIDE[lv].hint}</small></p>`;
     const [lo, hi] = DIARY_RANGE[lv];
@@ -844,13 +873,13 @@ Rules for the JSON you return:
   }
 
   function practiceView(mode) {
-    const s = sessions[mode], busy = !!pending[mode] || !!s.gen;
+    const s = sessions[mode], busy = !!pending[mode] || !!s.gen || (mode === "translate" && !!drillBusy);
     const head = `<div class="row between"><span class="label">${MODES[mode].name}</span>${s.fb ? "" : nextBtns(mode, busy)}</div>
       <div class="row lvrow"><span class="level">${promptLevel(s.prompt)}</span><span class="note">${promptLevel(s.prompt) !== lvl(mode) ? `레벨이 ${lvl(mode)}로 바뀌었어요 · 다음 문제부터 적용돼요` : levelProgress(mode)}</span></div>`;
     let tools = "";
     if (s.prompt.focus) tools += `<div class="drill">집중 연습 · <b>${CATS[s.prompt.focus]}</b>${s.drill ? ` ${s.drill.total - s.queue.length}/${s.drill.total}` : ""} — 이 부분을 특히 신경 써서 써 보세요.</div>`;
     if (s.prompt.repeat && !s.fb) tools += `<p class="note">준비된 문제를 모두 풀었어요. 'AI 새 문제'로 새 문제를 받을 수 있어요.</p>`;
-    if (mode === "translate" && !s.fb && !busy) tools += `
+    if (mode === "translate" && !s.fb && !busy && !s.prompt.focus) tools += `
       <form class="row custom" data-form="custom"><label class="visually-hidden" for="customKo">직접 넣을 한국어 문장</label>
         <input id="customKo" placeholder="연습하고 싶은 한국어 문장을 직접 넣어도 돼요"><button class="btn small">이 문장으로</button></form>`;
     if (mode === "expand" && !s.fb) tools += `<p class="hints"><b>써 볼 구조</b> · ${EXPAND_GUIDE[promptLevel(s.prompt)].chips.map(esc).join(" · ")}</p>`;
@@ -858,19 +887,20 @@ Rules for the JSON you return:
   }
   function nextBtns(mode, busy) {
     const label = mode === "diary" ? "다른 주제" : "다른 문장";
-    const gen = sessions[mode].gen;
+    const gen = sessions[mode].gen, weak = mode === "translate" ? topWeakCats()[0] : null;
     return `<div class="row"><button class="chip" data-act="newPrompt" ${busy ? "disabled" : ""}>${label}</button>
-      <button class="chip ai" data-act="aiPrompt" ${busy ? "disabled" : ""} title="Claude가 지금 레벨${mode === "translate" ? "과 자주 틀리는 패턴" : ""}에 맞춘 새 문제를 만들어요">${gen ? "만드는 중…" : "AI 새 문제"}</button></div>`;
+      <button class="chip ai" data-act="aiPrompt" ${busy ? "disabled" : ""} title="Claude가 지금 레벨에 맞춘 새 문제 3개를 만들어요">${gen === "ai" ? "만드는 중…" : "AI 새 문제"}</button>
+      ${weak ? `<button class="chip ai" data-act="drill" data-cat="${weak}" ${busy || drillBusy ? "disabled" : ""} title="자주 틀리는 패턴을 담은 문제 3개로 집중 연습해요">${drillBusy === weak ? "만드는 중…" : `약점 집중: ${CATS[weak]}`}</button>` : ""}</div>`;
   }
   function editorHtml(mode, s, p) {
     if (s.fb) return `<div class="box"><span class="label">${s.isRewrite ? "다시 쓴 글" : "내가 쓴 글"}</span>${markedHtml(s.text, s.fb.issues)}<div class="legend"><span class="grammar">문법 오류</span><span class="awkward">어색한 표현</span><span class="advanced">더 고급 표현</span></div></div>`;
-    const loading = !!pending[tab];
+    const loading = !!pending[tab], locked = loading || !!s.gen || (tab === "translate" && !!drillBusy);
     const [lo, hi] = DIARY_RANGE[promptLevel(p)];
     return `
       <label class="visually-hidden" for="draft">영어로 쓰기</label>
-      <textarea id="draft" spellcheck="false" autocapitalize="sentences" placeholder="${mode === "diary" ? `Write ${lo}-${hi} sentences in English...` : "Write in English..."}" ${loading ? "disabled" : ""}>${esc(s.text)}</textarea>
+      <textarea id="draft" spellcheck="false" autocapitalize="sentences" placeholder="${mode === "diary" ? `Write ${lo}-${hi} sentences in English...` : "Write in English..."}" ${locked ? "disabled" : ""}>${esc(s.text)}</textarea>
       <div class="row between">${meterHtml(mode, s.text, p)}
-        <button class="btn primary" data-act="submit" ${loading || !words(s.text) || s.gen ? "disabled" : ""}>${loading ? "피드백 받는 중…" : "피드백 받기"}</button></div>
+        <button class="btn primary" data-act="submit" ${locked || !words(s.text) ? "disabled" : ""}>${loading ? "피드백 받는 중…" : "피드백 받기"}</button></div>
       ${loading ? `<div class="loading" role="status"><span class="spinner"></span><span>글을 꼼꼼히 읽고 있어요 · <span class="elapsed" data-for="${tab}">${Math.round((Date.now() - pending[tab]) / 1000)}</span>초</span></div>` : ""}
       ${s.error && !loading ? `<div class="banner bad" role="alert">${esc(s.error)}</div>` : ""}
       <p class="note">Ctrl(⌘) + Enter로도 보낼 수 있어요.</p>`;
@@ -912,7 +942,7 @@ Rules for the JSON you return:
 
   // opts: { mode } for a first draft, { rewrite: entry } after a rewrite, { readonly: entry } for history.
   function feedbackHtml(s, opts) {
-    const fb = s.fb, hot = new Set(topWeakCats());
+    const fb = s.fb, hot = new Set(topWeakCats(s.fbTs ?? Infinity)), tagged = new Set();
     const order = { grammar: 0, awkward: 1, advanced: 2 };
     const list = fb.issues.map((it, i) => ({ it, i })).sort((a, b) => order[a.it.type] - order[b.it.type]);
     const errs = fb.issues.filter(x => x.type !== "advanced").length;
@@ -934,28 +964,45 @@ Rules for the JSON you return:
     let buttons;
     if (opts.readonly) buttons = `<button class="btn primary" data-act="openRewrite" data-id="${opts.readonly.id}">지금 다시 쓰기</button><button class="btn" data-act="rewriteDone">목록으로</button>`;
     else if (opts.rewrite) buttons = `<button class="btn primary" data-act="rewriteDone">목록으로</button><button class="btn" data-act="openRewrite" data-id="${opts.rewrite.id}">한 번 더 다시 쓰기</button>`;
-    else buttons = `<button class="btn primary" data-act="next">다음 문제</button><button class="btn" data-act="startRewrite">지금 바로 다시 쓰기</button>`;
+    else buttons = `<button class="btn primary" data-act="next">${s.queue?.length ? "다음 연습 문장" : "다음 문제"}</button><button class="btn" data-act="startRewrite" ${pending.rewrite ? "disabled title=\"다시 쓰기 탭의 피드백을 기다리는 중이에요\"" : ""}>지금 바로 다시 쓰기</button>`;
+    const d = !opts.rewrite && !opts.readonly && s.drill;
+    const drillDone = d && s.prompt.focus && !s.queue?.length && d.results?.length === d.total
+      ? (() => { const clean = d.results.filter(r => !r.errs).length, avg = Math.round(d.results.reduce((x, r) => x + r.score, 0) / d.results.length);
+          return `<div class="compare ${clean === d.total ? "" : "mixed"}"><b>집중 연습 끝 · ${esc(CATS[d.cat])}: ${d.total}개 중 ${clean}개에서 이 실수가 없었어요 · 평균 ${avg}점</b>
+            <span class="note">${clean === d.total ? "이 패턴은 잘 잡혔어요. 약점 리포트에서 다음 패턴을 연습해 보세요." : "틀린 문장은 내일 '다시 쓰기'와 복습 카드로 다시 나와요."}</span></div>`; })() : "";
     return `<div class="fb" aria-live="polite">
       <div class="scoreline"><div class="score">${fb.score}<small>/100</small></div>
         <div><p class="verdict">${esc(fb.verdict)}</p>${fb.praise ? `<p class="praise">👍 ${esc(fb.praise)}</p>` : ""}</div></div>
       ${lc ? `<div class="compare ${up ? "" : "mixed"}"><b>${up ? `${MODES[lc.mode].short} 레벨이 ${lc.to}로 올라갔어요. 다음 문제부터 더 어려워져요.` : `${MODES[lc.mode].short} 레벨을 ${lc.to}로 낮췄어요. 탄탄하게 다진 뒤 다시 올라가요.`}</b></div>` : ""}
-      ${compare}
+      ${compare}${drillDone}
       <div class="box"><span class="label">자연스럽게 고친 글</span><p class="en">${esc(fb.corrected)}</p></div>
       ${list.length ? `<span class="label">고칠 점 ${errs}개${fb.issues.length > errs ? ` · 더 좋은 표현 ${fb.issues.length - errs}개` : ""}</span>
       <ol class="issues">${list.map(({ it, i }) => `
         <li class="issue ${it.type}" id="issue-${i}">
-          <div class="row"><span class="tag ${it.type}">${TYPE_LABEL[it.type]}</span><span class="tag cat">${CATS[it.category] || "기타"}</span>${hot.has(it.category) && it.type !== "advanced" ? `<span class="tag hot">자주 틀림</span>` : ""}</div>
+          <div class="row"><span class="tag ${it.type}">${TYPE_LABEL[it.type]}</span><span class="tag cat">${CATS[it.category] || "기타"}</span>${hot.has(it.category) && it.type !== "advanced" && !tagged.has(it.category) && tagged.add(it.category) ? `<span class="tag hot">자주 틀림</span>` : ""}</div>
           <div class="change"><del>${esc(it.original)}</del> → <ins>${esc(it.fix)}</ins></div>
           <p class="why">${esc(it.why)}</p>
+          ${qaHtml(s, it, i)}
         </li>`).join("")}</ol>` : `<p class="praise">고칠 곳이 없어요. 이 레벨에서 자연스러운 답이에요.</p>`}
       ${fb.model_answers?.length ? `<div class="box"><span class="label">이렇게도 쓸 수 있어요 · 정답은 하나가 아니에요</span>
         <ul class="answers">${fb.model_answers.map(a => `<li><span class="en">${esc(a.text)}</span><small>${esc(a.note)}</small></li>`).join("")}</ul></div>` : ""}
       ${fb.expressions?.length ? `<div class="box"><span class="label">새 표현</span>
         <ul class="exprs">${fb.expressions.map(x => `<li><b>${esc(x.expression)}</b> · ${esc(x.meaning)}<br><small>${esc(x.example)}</small></li>`).join("")}</ul></div>` : ""}
-      ${s.saved ? `<p class="note">복습 카드 ${s.saved.expr + s.saved.fix}장을 만들었어요 (새 표현 ${s.saved.expr} · 내 실수 ${s.saved.fix}).</p>` : ""}
+      ${s.saved ? `<p class="note">${s.saved.expr + s.saved.fix ? `복습 카드 ${s.saved.expr + s.saved.fix}장을 만들었어요 (내 실수 ${s.saved.fix} · 새 표현 ${s.saved.expr}).` : ""}${s.saved.capped ? ` 오늘 새 카드 한도(${CARD_CAP}장)에 닿아서 나머지는 저장하지 않았어요.` : ""}</p>` : ""}
       ${opts.readonly ? "" : nextRewrite}
       <div class="row">${buttons}</div>
     </div>`;
+  }
+
+  // Follow-up question on one correction, answered inline and kept with the feedback.
+  function qaHtml(s, it, i) {
+    const asked = (it.qa || []).map(x => `<p class="q">Q. ${esc(x.q)}</p><p>${esc(x.a)}</p>`).join("");
+    const open = s.askOpen === i, busy = s.asking === i;
+    const form = open ? `<form class="ask" data-form="ask" data-i="${i}"><label class="visually-hidden" for="ask-${i}">이 고침에 대한 질문</label>
+        <input id="ask-${i}" autocomplete="off" placeholder="예: 왜 the가 아니라 a예요?" ${busy ? "disabled" : ""}><button class="btn small primary" ${busy ? "disabled" : ""}>${busy ? "답 받는 중…" : "묻기"}</button></form>
+        ${s.askError && open ? `<p class="why" role="alert">${esc(s.askError)}</p>` : ""}`
+      : `<div><button class="linkbtn" type="button" data-act="ask" data-i="${i}">이 고침에 대해 질문하기</button></div>`;
+    return `${asked ? `<div class="qa">${asked}</div>` : ""}${form}`;
   }
 
   /* rewrite */
@@ -966,7 +1013,8 @@ Rules for the JSON you return:
       const last = lastAttempt(e), all = [e, ...(e.rewrites || [])];
       const head = `<div class="row between"><span class="label">지난 글 · ${MODES[e.mode].name} · ${md(new Date(e.ts))}</span><button class="chip" data-act="rewriteDone">목록으로</button></div>`;
       const hist = all.length > 1 ? `<p class="note">${all.map((a, i) => `${i ? `${i + 1}차` : "처음"} ${a.fb.score}점`).join(" → ")}</p>` : "";
-      return `<section class="panel">${head}${promptHtml(e.mode, e.prompt)}${hist}${editorHtml(e.mode, { text: last.text, fb: last.fb, isRewrite: all.length > 1 }, e.prompt)}${feedbackHtml({ text: last.text, fb: last.fb }, { readonly: e })}</section>`;
+      Object.assign(s, { fbTs: last.ts });
+      return `<section class="panel">${head}${promptHtml(e.mode, e.prompt)}${hist}${editorHtml(e.mode, { text: last.text, fb: last.fb, isRewrite: all.length > 1 }, e.prompt)}${feedbackHtml(Object.assign(s, { text: last.text, fb: last.fb }), { readonly: e })}</section>`;
     }
     if (e) {
       const head = `<div class="row between"><span class="label">다시 쓰기 · ${MODES[e.mode].name}</span><button class="chip" data-act="rewriteDone" ${pending.rewrite ? "disabled" : ""}>목록으로</button></div>`;
@@ -979,15 +1027,17 @@ Rules for the JSON you return:
     const errCount = e => lastAttempt(e).fb.issues.filter(x => x.type !== "advanced").length;
     const item = (e, meta, primary) => `<li><div class="t"><b>${title(e)}</b><span>${MODES[e.mode].short} · ${meta}</span></div>
       <div class="row"><button class="btn small" data-act="viewEntry" data-id="${e.id}">피드백 보기</button><button class="btn small ${primary ? "primary" : ""}" data-act="openRewrite" data-id="${e.id}">${primary ? "다시 쓰기" : "지금 쓰기"}</button></div></li>`;
-    const past = [...data.entries].reverse().slice(0, 30);
+    const dueIds = new Set(due.map(e => e.id)), pastAll = [...data.entries].reverse().filter(e => !dueIds.has(e.id));
+    const past = pastAll.slice(0, showAllPast ? 60 : 5);
     return `<section class="panel">
       <span class="label">오늘 다시 쓸 글</span>
       <p class="note">첨삭받은 글은 다음 날 여기에 올라와요. 피드백을 보지 말고 기억으로 다시 쓰면, 같은 실수를 반복하는지 바로 확인할 수 있어요.</p>
-      ${due.length ? `<ul class="list">${due.map(e => item(e, `${md(new Date(e.ts))} · 고칠 점 ${errCount(e)}개 · ${lastAttempt(e).fb.score}점`, true)).join("")}</ul>` : `<p class="empty">${later.length ? "오늘 다시 쓸 글은 다 했어요." : "아직 다시 쓸 글이 없어요. 번역·확장·일기에서 피드백을 받으면 다음 날 여기에 올라와요."}</p>`}
+      ${due.length ? `<ul class="list">${due.map(e => item(e, `${md(new Date(e.ts))} · 고칠 점 ${errCount(e)}개 · ${lastAttempt(e).fb.score}점`, true)).join("")}</ul>` : `<p class="empty">${later.length ? "오늘 다시 쓸 글은 없어요. 아래 글들은 정해진 날에 올라와요." : "아직 다시 쓸 글이 없어요. 번역·확장·일기에서 피드백을 받으면 다음 날 여기에 올라와요."}</p>`}
       ${later.length ? `<details><summary class="note">곧 다시 쓸 글 ${later.length}개</summary><ul class="list" style="margin-top:8px">${later.map(e => item(e, `${md(new Date(e.rewriteDue))}부터 · 고칠 점 ${errCount(e)}개`, false)).join("")}</ul></details>` : ""}
     </section>
     ${past.length ? `<section class="panel"><span class="label">지난 글</span>
-      <ul class="list">${past.map(e => `<li><div class="t"><b>${title(e)}</b><span>${MODES[e.mode].short} · ${e.level || ""} · ${md(new Date(e.ts))} · ${[e, ...(e.rewrites || [])].map(a => a.fb.score).join("→")}점</span></div><button class="btn small" data-act="viewEntry" data-id="${e.id}">피드백 보기</button></li>`).join("")}</ul></section>` : ""}`;
+      <ul class="list">${past.map(e => `<li><div class="t"><b>${title(e)}</b><span>${[MODES[e.mode].short, LEVELS.includes(e.level) ? e.level : "", md(new Date(e.ts)), [e, ...(e.rewrites || [])].map(a => a.fb.score).join("→") + "점"].filter(Boolean).join(" · ")}</span></div><button class="btn small" data-act="viewEntry" data-id="${e.id}">피드백 보기</button></li>`).join("")}</ul>
+      ${pastAll.length > past.length ? `<div><button class="btn small" data-act="morePast">지난 글 더 보기 (${pastAll.length - past.length})</button></div>` : ""}</section>` : ""}`;
   }
 
   /* review cards */
@@ -1030,26 +1080,32 @@ Rules for the JSON you return:
     const at = findSpan(c.context, c.wrong, 0);
     return at < 0 ? `${esc(c.context)} <mark>${esc(c.wrong)}</mark>` : `${esc(c.context.slice(0, at))}<mark>${esc(c.wrong)}</mark>${esc(c.context.slice(at + c.wrong.length))}`;
   }
-  // Cards come from the feedback's new expressions and from the learner's own errors (up to 3 per piece of writing).
+  // Cards come from the learner's own errors first (grammar, or awkward phrasing in a recurring category, up to 3)
+  // and then the feedback's new expressions (up to 2), with at most CARD_CAP new cards a day so reviews stay manageable.
+  const CARD_CAP = 10;
   function addCards(fb, text) {
-    const n = { expr: 0, fix: 0 }, due = startOfDay(Date.now(), 1), now = Date.now();
+    const n = { expr: 0, fix: 0, capped: false }, due = startOfDay(Date.now(), 1), now = Date.now();
+    let room = CARD_CAP - data.cards.filter(c => c.added >= startOfDay(now)).length;
     const has = (kind, a, b = "") => data.cards.some(c => c.kind === kind && normAns(c.expr) === normAns(a) && normAns(c.wrong || "") === normAns(b));
-    for (const x of fb.expressions || []) {
-      const expr = x.expression.trim();
-      if (!expr || has("expr", expr)) continue;
-      data.cards.push({ id: uid(), kind: "expr", expr, meaning: x.meaning, example: x.example, box: 0, due, added: now, updated: now });
-      n.expr++;
-    }
+    const hot = new Set(topWeakCats());
     const sents = text.match(/[^.!?\n]+[.!?]*/g) || [text];
-    for (const it of fb.issues.filter(x => x.type !== "advanced").slice(0, 3)) {
+    for (const it of fb.issues.filter(x => x.type === "grammar" || (x.type === "awkward" && hot.has(x.category))).slice(0, 3)) {
       if (has("fix", it.fix, it.original)) continue;
+      if (room <= 0) { n.capped = true; break; }
       const context = (sents.find(s => findSpan(s, it.original, 0) >= 0) || it.original).trim();
       const at = findSpan(context, it.original, 0);
       const fixed = at < 0 ? "" : context.slice(0, at) + it.fix + context.slice(at + it.original.length);
       data.cards.push({ id: uid(), kind: "fix", expr: it.fix, wrong: it.original, context, fixed, why: it.why, category: it.category, box: 0, due, added: now, updated: now });
-      n.fix++;
+      n.fix++; room--;
     }
-    return n.expr + n.fix ? n : null;
+    for (const x of (fb.expressions || []).filter(x => x.meaning.trim()).slice(0, 2)) {
+      const expr = x.expression.trim();
+      if (!expr || has("expr", expr)) continue;
+      if (room <= 0) { n.capped = true; break; }
+      data.cards.push({ id: uid(), kind: "expr", expr, meaning: x.meaning, example: x.example, box: 0, due, added: now, updated: now });
+      n.expr++; room--;
+    }
+    return n.expr + n.fix || n.capped ? n : null;
   }
 
   /* report */
@@ -1097,7 +1153,7 @@ Rules for the JSON you return:
         <div class="top"><b>${CATS[k] || k}</b><span>전체 ${v.n}회 · 최근 2주 100단어당 ${wRecent ? rate(v.rate) : "–"}회${trend(v)}</span></div>
         <div class="track"><i style="width:${(v.n / max) * 100}%"></i></div>
         <div class="ex">최근: <del>${esc(v.last.it.original)}</del> → <b>${esc(v.last.it.fix)}</b> — ${esc(v.last.it.why)}</div>
-        ${k !== "other" ? `<div><button class="btn small" data-act="drill" data-cat="${k}" ${drillBusy ? "disabled" : ""}>${drillBusy === k ? "문제 만드는 중…" : "이 패턴 집중 연습 (3문장)"}</button></div>` : ""}</li>`).join("")}</ul>`
+        ${k !== "other" ? `<div><button class="btn small" data-act="drill" data-cat="${k}" ${drillBusy || pending.translate ? "disabled" : ""}>${drillBusy === k ? "문제 만드는 중…" : "이 패턴 집중 연습 (3문장)"}</button></div>` : ""}</li>`).join("")}</ul>`
       : `<p class="empty">피드백을 받으면 관사·시제·전치사처럼 자주 틀리는 패턴이 여기에 쌓이고, 패턴별로 집중 연습을 할 수 있어요.</p>`}
     </section>
     <section class="panel">
@@ -1144,9 +1200,10 @@ Rules for the JSON you return:
         data.entries.push(entry);
         s.entryId = entry.id;
         changed = entry;
-        if (prompt.level === lvl(mode)) s.levelChange = adjustLevel(mode);
+        if (prompt.level === lvl(mode) && !prompt.revise) s.levelChange = adjustLevel(mode);
+        if (prompt.focus && s.drill?.cat === prompt.focus) (s.drill.results ||= []).push({ score: fb.score, errs: fb.issues.filter(x => x.type !== "advanced" && x.category === prompt.focus).length });
       }
-      Object.assign(s, { text, fb, prev, isRewrite: !!e, saved: addCards(fb, text) });
+      Object.assign(s, { text, fb, prev, fbTs: Date.now(), isRewrite: !!e, saved: addCards(fb, text), askOpen: null, asking: null, askError: "" });
       save(changed);
       if (saveFailed) s.error = "기록을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.";
     } catch (err) {
@@ -1159,7 +1216,7 @@ Rules for the JSON you return:
   }
   function startRewrite() {
     const id = sessions[tab].entryId;
-    if (!id) return;
+    if (!id || pending.rewrite) return;
     nextPrompt(tab);
     openRewrite(id);
   }
@@ -1173,35 +1230,59 @@ Rules for the JSON you return:
     const s = sessions[mode];
     if (s.queue?.length) s.prompt = s.queue.shift();
     else { s.prompt = freshPrompt(mode, s.prompt); s.drill = null; }
-    Object.assign(s, { text: "", fb: null, entryId: null, error: "", levelChange: null, saved: null });
+    Object.assign(s, { text: s.prompt.revise || "", fb: null, entryId: null, error: "", levelChange: null, saved: null });
   }
   async function aiPrompt(mode) {
     const s = sessions[mode];
     if (s.gen || pending[mode]) return;
-    s.gen = true; s.error = ""; render();
+    s.gen = "ai"; s.error = ""; render();
     try {
-      const focus = mode === "translate" ? topWeakCats()[0] || null : null;
-      const items = await generate(mode, { focus, n: 3 });
-      Object.assign(s, { prompt: items[0], queue: items.slice(1), drill: focus ? { cat: focus, total: items.length } : null, text: "", fb: null, entryId: null });
+      const items = await generate(mode, { n: 3 });
+      Object.assign(s, { prompt: items[0], queue: items.slice(1), drill: null, text: "", fb: null, entryId: null });
     } catch (err) {
       s.error = err instanceof UserError ? err.message : "새 문제를 만들지 못했어요. 다시 시도해 주세요.";
     } finally { s.gen = false; render(); }
   }
   async function drill(cat) {
     if (drillBusy) return;
-    if (!canAsk() && ai.known) { if (!inClaude) openKey(); reportMsg = inClaude ? "이 화면에서는 Claude를 쓸 수 없어요." : "API 키를 먼저 넣어 주세요."; render(); return; }
+    if (pending.translate || sessions.translate.gen) { reportMsg = "번역 탭의 피드백을 기다리는 중이에요. 끝난 뒤에 다시 눌러 주세요."; render(); return; }
+    if (!canAsk() && ai.known) {
+      if (!inClaude) openKey();
+      const msg = inClaude ? "이 화면에서는 Claude를 쓸 수 없어요." : "API 키를 먼저 넣어 주세요.";
+      if (tab === "translate") sessions.translate.error = msg; else reportMsg = msg;
+      render(); return;
+    }
     drillBusy = cat; reportMsg = ""; render();
     try {
       const items = await generate("translate", { focus: cat, n: 3 });
       const s = sessions.translate;
-      Object.assign(s, { prompt: items[0], queue: items.slice(1), drill: { cat, total: items.length }, text: "", fb: null, entryId: null, error: "" });
+      Object.assign(s, { prompt: items[0], queue: items.slice(1), drill: { cat, total: items.length, results: [] }, text: items[0].revise || "", fb: null, entryId: null, error: "" });
       drillBusy = null;
       setTab("translate");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      reportMsg = err instanceof UserError ? err.message : "문제를 만들지 못했어요. 다시 시도해 주세요.";
+      const msg = err instanceof UserError ? err.message : "문제를 만들지 못했어요. 다시 시도해 주세요.";
+      if (tab === "translate") sessions.translate.error = msg; else reportMsg = msg;
       drillBusy = null; render();
     }
+  }
+  const QA_SYSTEM = "You are an English writing coach for Korean adults at CEFR B2 and above. Answer the learner's follow-up question about one correction in natural Korean, in 2 to 4 sentences, with one short English example. Reply only with the JSON requested.";
+  async function ask(i, q) {
+    const s = sessions[tab], it = s.fb?.issues[i];
+    if (!it || !q || s.asking != null) return;
+    const e = data.entries.find(x => x.id === s.entryId);
+    s.asking = i; s.askError = ""; render();
+    try {
+      const r = await callClaude({ system: QA_SYSTEM, schema: obj({ answer: str }), shape: `{"answer": "..."}`, effort: "low",
+        user: `Learner's text:\n${s.text}\n\nCorrection: "${it.original}" → "${it.fix}" (${CAT_EN[it.category]})\nExplanation already given: ${it.why}\n${(it.qa || []).map(x => `Earlier question: ${x.q}\nEarlier answer: ${x.a}\n`).join("")}\nLearner's question: ${q}` });
+      const a = typeof r?.answer === "string" && r.answer.trim();
+      if (!a) throw new UserError("답을 읽지 못했어요. 다시 시도해 주세요.");
+      (it.qa ||= []).push({ q, a });
+      s.askOpen = null;
+      if (e) save(e);
+    } catch (err) {
+      s.askError = err instanceof UserError ? err.message : "답을 받지 못했어요. 다시 시도해 주세요.";
+    } finally { s.asking = null; render(); }
   }
   function grade(ok) {
     const c = data.cards.find(x => x.id === review.id);
@@ -1238,6 +1319,8 @@ Rules for the JSON you return:
     else if (act === "grade") grade(t.dataset.ok === "1");
     else if (act === "delCard") { data.cards = data.cards.filter(c => c.id !== t.dataset.id); data.deleted.push(t.dataset.id); save(); render(); }
     else if (act === "drill") drill(t.dataset.cat);
+    else if (act === "morePast") { showAllPast = true; render(); }
+    else if (act === "ask") { const s = sessions[tab]; s.askOpen = +t.dataset.i; s.askError = ""; render(); document.getElementById("ask-" + t.dataset.i)?.focus(); }
   });
   document.addEventListener("submit", ev => {
     const f = ev.target.dataset.form;
@@ -1249,13 +1332,17 @@ Rules for the JSON you return:
       Object.assign(sessions.translate, { prompt: { ko, level: lvl("translate") }, queue: [], drill: null, text: "", fb: null, entryId: null, error: "" });
       render();
       $("#draft")?.focus();
+    } else if (f === "ask") {
+      ask(+ev.target.dataset.i, $("#ask-" + ev.target.dataset.i).value.trim());
     } else if (f === "reveal") {
       const c = data.cards.find(x => x.id === review.id);
       const guess = $("#guess").value.trim();
-      const right = c && guess && (normAns(guess) === normAns(c.expr) || (c.fixed && normAns(guess) === normAns(c.fixed)));
+      const g = normAns(guess), a = normAns(c?.expr || "");
+      // Exact match, the whole corrected sentence, or a short answer that contains the expected phrase.
+      const right = c && guess && (g === a || (c.fixed && g === normAns(c.fixed)) || (a && ` ${g} `.includes(` ${a} `) && words(guess) <= words(c.expr) + 4));
       review = { ...review, shown: true, guess, result: !guess ? null : right ? "right" : "wrong" };
       render();
-      document.querySelector('.card [data-act="grade"].primary')?.focus();
+      document.querySelector(review.result ? '.card [data-act="grade"].primary' : '.card [data-act="grade"][data-ok="0"]')?.focus();
     }
   });
   let draftTimer;
