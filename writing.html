@@ -150,6 +150,8 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-col
 .legend .awkward::before { background: var(--warn); }
 .legend .advanced::before { background: var(--adv); }
 .issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.panel, .fb, .issues, .box, .issue { grid-template-columns: minmax(0, 1fr); }
+.issue { min-width: 0; }
 .issue { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; scroll-margin: 80px; }
 .issue.grammar { border-left-color: var(--bad); }
 .issue.awkward { border-left-color: var(--warn); }
@@ -429,7 +431,7 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
     // Keep local storage bounded by dropping the oldest finished entries; anything still due for a rewrite stays.
     for (let i = 0; data.entries.length > 400 && i < data.entries.length;) {
       const e = data.entries[i];
-      if (e.rewriteDue || e === changed) i++; else data.entries.splice(i, 1);
+      if (e.rewriteDue || e === changed || Object.values(sessions).some(x => x.entryId === e.id)) i++; else data.entries.splice(i, 1);
     }
     if (data.deleted.length > 500) data.deleted = data.deleted.slice(-500);
     saveFailed = !store.set(DATA_KEY, data);
@@ -809,7 +811,7 @@ Rules for the JSON you return:
   if (sessions.rewrite.entryId && !data.entries.some(e => e.id === sessions.rewrite.entryId)) sessions.rewrite = { entryId: null, text: "", fb: null };
   const pending = {}; // tab → start time of a feedback request in flight
   let review = { id: null, shown: false, guess: "", result: null };
-  let reportMsg = "", drillBusy = null, showAllPast = false;
+  let reportMsg = "", drillBusy = null, pastLimit = 5;
   function saveDrafts() {
     const d = {};
     for (const m of Object.keys(MODES)) { const s = sessions[m]; if (!s.fb) d[m] = { prompt: s.prompt, text: s.text, queue: s.queue, drill: s.drill }; }
@@ -841,10 +843,12 @@ Rules for the JSON you return:
     renderChrome();
     const v = $("#view"), a = document.activeElement;
     const keep = a && a.id && v.contains(a) ? { id: a.id, s: a.selectionStart, e: a.selectionEnd, top: a.scrollTop } : null;
+    const vals = [...v.querySelectorAll("input[id]")].map(i => [i.id, i.value]); // the textarea's text lives in the session
     if (tab === "review") v.innerHTML = reviewView();
     else if (tab === "report") v.innerHTML = reportView();
     else if (tab === "rewrite") v.innerHTML = rewriteView();
     else v.innerHTML = practiceView(tab);
+    for (const [id, val] of vals) { const i = document.getElementById(id); if (i && !i.value) i.value = val; }
     const el = keep && document.getElementById(keep.id);
     if (el && !el.disabled) {
       el.focus({ preventScroll: true });
@@ -874,8 +878,8 @@ Rules for the JSON you return:
 
   function practiceView(mode) {
     const s = sessions[mode], busy = !!pending[mode] || !!s.gen || (mode === "translate" && !!drillBusy);
-    const head = `<div class="row between"><span class="label">${MODES[mode].name}</span>${s.fb ? "" : nextBtns(mode, busy)}</div>
-      <div class="row lvrow"><span class="level">${promptLevel(s.prompt)}</span><span class="note">${promptLevel(s.prompt) !== lvl(mode) ? `레벨이 ${lvl(mode)}로 바뀌었어요 · 다음 문제부터 적용돼요` : levelProgress(mode)}</span></div>`;
+    const head = `<div class="row between"><span class="label">${s.prompt.revise ? `글 다듬기 · ${esc(CATS[s.prompt.focus])}` : MODES[mode].name}</span>${s.fb ? "" : nextBtns(mode, busy)}</div>
+      <div class="row lvrow"><span class="level">${promptLevel(s.prompt)}</span><span class="note">${s.prompt.revise ? "레벨 점수에는 들어가지 않는 집중 연습이에요" : promptLevel(s.prompt) !== lvl(mode) ? `레벨이 ${lvl(mode)}로 바뀌었어요 · 다음 문제부터 적용돼요` : levelProgress(mode)}</span></div>`;
     let tools = "";
     if (s.prompt.focus) tools += `<div class="drill">집중 연습 · <b>${CATS[s.prompt.focus]}</b>${s.drill ? ` ${s.drill.total - s.queue.length}/${s.drill.total}` : ""} — 이 부분을 특히 신경 써서 써 보세요.</div>`;
     if (s.prompt.repeat && !s.fb) tools += `<p class="note">준비된 문제를 모두 풀었어요. 'AI 새 문제'로 새 문제를 받을 수 있어요.</p>`;
@@ -966,10 +970,11 @@ Rules for the JSON you return:
     else if (opts.rewrite) buttons = `<button class="btn primary" data-act="rewriteDone">목록으로</button><button class="btn" data-act="openRewrite" data-id="${opts.rewrite.id}">한 번 더 다시 쓰기</button>`;
     else buttons = `<button class="btn primary" data-act="next">${s.queue?.length ? "다음 연습 문장" : "다음 문제"}</button><button class="btn" data-act="startRewrite" ${pending.rewrite ? "disabled title=\"다시 쓰기 탭의 피드백을 기다리는 중이에요\"" : ""}>지금 바로 다시 쓰기</button>`;
     const d = !opts.rewrite && !opts.readonly && s.drill;
-    const drillDone = d && s.prompt.focus && !s.queue?.length && d.results?.length === d.total
-      ? (() => { const clean = d.results.filter(r => !r.errs).length, avg = Math.round(d.results.reduce((x, r) => x + r.score, 0) / d.results.length);
-          return `<div class="compare ${clean === d.total ? "" : "mixed"}"><b>집중 연습 끝 · ${esc(CATS[d.cat])}: ${d.total}개 중 ${clean}개에서 이 실수가 없었어요 · 평균 ${avg}점</b>
-            <span class="note">${clean === d.total ? "이 패턴은 잘 잡혔어요. 약점 리포트에서 다음 패턴을 연습해 보세요." : "틀린 문장은 내일 '다시 쓰기'와 복습 카드로 다시 나와요."}</span></div>`; })() : "";
+    const done = d?.results?.length || 0;
+    const drillDone = d && s.prompt.focus && !s.queue?.length && done
+      ? (() => { const clean = d.results.filter(r => !r.errs).length, avg = Math.round(d.results.reduce((x, r) => x + r.score, 0) / done);
+          return `<div class="compare ${clean === done ? "" : "mixed"}"><b>집중 연습 끝 · ${esc(CATS[d.cat])}: ${done}개 중 ${clean}개에서 이 실수가 없었어요 · 평균 ${avg}점</b>
+            <span class="note">${clean === done ? "이 패턴은 잘 잡혔어요. 약점 리포트에서 다음 패턴을 연습해 보세요." : "틀린 문장은 내일 '다시 쓰기'와 복습 카드로 다시 나와요."}</span></div>`; })() : "";
     return `<div class="fb" aria-live="polite">
       <div class="scoreline"><div class="score">${fb.score}<small>/100</small></div>
         <div><p class="verdict">${esc(fb.verdict)}</p>${fb.praise ? `<p class="praise">👍 ${esc(fb.praise)}</p>` : ""}</div></div>
@@ -1028,7 +1033,7 @@ Rules for the JSON you return:
     const item = (e, meta, primary) => `<li><div class="t"><b>${title(e)}</b><span>${MODES[e.mode].short} · ${meta}</span></div>
       <div class="row"><button class="btn small" data-act="viewEntry" data-id="${e.id}">피드백 보기</button><button class="btn small ${primary ? "primary" : ""}" data-act="openRewrite" data-id="${e.id}">${primary ? "다시 쓰기" : "지금 쓰기"}</button></div></li>`;
     const dueIds = new Set(due.map(e => e.id)), pastAll = [...data.entries].reverse().filter(e => !dueIds.has(e.id));
-    const past = pastAll.slice(0, showAllPast ? 60 : 5);
+    const past = pastAll.slice(0, pastLimit);
     return `<section class="panel">
       <span class="label">오늘 다시 쓸 글</span>
       <p class="note">첨삭받은 글은 다음 날 여기에 올라와요. 피드백을 보지 말고 기억으로 다시 쓰면, 같은 실수를 반복하는지 바로 확인할 수 있어요.</p>
@@ -1076,6 +1081,16 @@ Rules for the JSON you return:
       ${all.length ? `<details><summary class="note">저장된 카드 ${all.length}장 보기</summary><ul class="list" style="margin-top:8px">${all.map(c => `<li><div class="t"><b>${c.kind === "fix" ? `${esc(c.wrong)} → ${esc(c.expr)}` : esc(c.expr)}</b><span>${c.kind === "fix" ? "내 실수" : esc(c.meaning)} · ${c.due <= Date.now() ? "오늘 복습" : `${md(new Date(c.due))} 복습`}</span></div><button class="btn small" data-act="delCard" data-id="${c.id}" aria-label="${esc(c.expr)} 카드 삭제">삭제</button></li>`).join("")}</ul></details>` : ""}
     </section>`;
   }
+  // Right means the expected phrase itself (an expression may drop a leading to/a/the), the whole corrected sentence,
+  // or, for an error card, an exact piece of the corrected sentence that contains the fix ("If I had known").
+  function isRight(c, guess) {
+    const g = normAns(guess), a = normAns(c.expr), strip = t => t.replace(/^(to|a|an|the) /, "");
+    if (!g || !a) return false;
+    if (g === a || strip(g) === strip(a)) return true;
+    if (c.kind !== "fix" || !c.fixed) return false;
+    const f = ` ${normAns(c.fixed)} `;
+    return g === f.trim() || (f.includes(` ${g} `) && ` ${g} `.includes(` ${a} `));
+  }
   function ctxHtml(c) {
     const at = findSpan(c.context, c.wrong, 0);
     return at < 0 ? `${esc(c.context)} <mark>${esc(c.wrong)}</mark>` : `${esc(c.context.slice(0, at))}<mark>${esc(c.wrong)}</mark>${esc(c.context.slice(at + c.wrong.length))}`;
@@ -1086,11 +1101,11 @@ Rules for the JSON you return:
   function addCards(fb, text) {
     const n = { expr: 0, fix: 0, capped: false }, due = startOfDay(Date.now(), 1), now = Date.now();
     let room = CARD_CAP - data.cards.filter(c => c.added >= startOfDay(now)).length;
-    const has = (kind, a, b = "") => data.cards.some(c => c.kind === kind && normAns(c.expr) === normAns(a) && normAns(c.wrong || "") === normAns(b));
+    const has = (kind, a) => data.cards.some(c => c.kind === kind && normAns(c.expr) === normAns(a));
     const hot = new Set(topWeakCats());
     const sents = text.match(/[^.!?\n]+[.!?]*/g) || [text];
     for (const it of fb.issues.filter(x => x.type === "grammar" || (x.type === "awkward" && hot.has(x.category))).slice(0, 3)) {
-      if (has("fix", it.fix, it.original)) continue;
+      if (has("fix", it.fix)) continue;
       if (room <= 0) { n.capped = true; break; }
       const context = (sents.find(s => findSpan(s, it.original, 0) >= 0) || it.original).trim();
       const at = findSpan(context, it.original, 0);
@@ -1189,21 +1204,22 @@ Rules for the JSON you return:
       const last = e ? lastAttempt(e) : null;
       const prev = last ? { issues: last.fb.issues, text: last.text, score: last.fb.score } : null;
       const fb = await askFeedback(realMode, prompt, text, prev, level);
+      const now = Date.now();
       s.levelChange = null;
       let changed;
       if (e) {
-        (e.rewrites ||= []).push({ text, fb, ts: Date.now() });
-        e.rewriteDue = hasErrors(fb) ? startOfDay(Date.now(), 3) : null;
+        (e.rewrites ||= []).push({ text, fb, ts: now });
+        e.rewriteDue = hasErrors(fb) ? startOfDay(now, 3) : null;
         changed = e;
       } else {
-        const entry = { id: uid(), mode, level, prompt, text, fb, ts: Date.now(), rewrites: [], rewriteDue: hasErrors(fb) ? startOfDay(Date.now(), 1) : null };
+        const entry = { id: uid(), mode, level, prompt, text, fb, ts: now, rewrites: [], rewriteDue: hasErrors(fb) ? startOfDay(now, 1) : null };
         data.entries.push(entry);
         s.entryId = entry.id;
         changed = entry;
         if (prompt.level === lvl(mode) && !prompt.revise) s.levelChange = adjustLevel(mode);
         if (prompt.focus && s.drill?.cat === prompt.focus) (s.drill.results ||= []).push({ score: fb.score, errs: fb.issues.filter(x => x.type !== "advanced" && x.category === prompt.focus).length });
       }
-      Object.assign(s, { text, fb, prev, fbTs: Date.now(), isRewrite: !!e, saved: addCards(fb, text), askOpen: null, asking: null, askError: "" });
+      Object.assign(s, { text, fb, prev, fbTs: now, isRewrite: !!e, saved: addCards(fb, text), askOpen: null, asking: null, askError: "" });
       save(changed);
       if (saveFailed) s.error = "기록을 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.";
     } catch (err) {
@@ -1222,7 +1238,8 @@ Rules for the JSON you return:
   }
   function openRewrite(id) {
     if (pending.rewrite) return;
-    sessions.rewrite = { entryId: id, text: sessions.rewrite.entryId === id && !sessions.rewrite.fb ? sessions.rewrite.text : "", fb: null };
+    const keepText = sessions.rewrite.entryId === id && !sessions.rewrite.fb ? sessions.rewrite.text : "";
+    sessions.rewrite = { entryId: id, text: keepText || data.entries.find(e => e.id === id)?.prompt.revise || "", fb: null };
     setTab("rewrite");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1319,7 +1336,7 @@ Rules for the JSON you return:
     else if (act === "grade") grade(t.dataset.ok === "1");
     else if (act === "delCard") { data.cards = data.cards.filter(c => c.id !== t.dataset.id); data.deleted.push(t.dataset.id); save(); render(); }
     else if (act === "drill") drill(t.dataset.cat);
-    else if (act === "morePast") { showAllPast = true; render(); }
+    else if (act === "morePast") { pastLimit += 30; render(); }
     else if (act === "ask") { const s = sessions[tab]; s.askOpen = +t.dataset.i; s.askError = ""; render(); document.getElementById("ask-" + t.dataset.i)?.focus(); }
   });
   document.addEventListener("submit", ev => {
@@ -1329,6 +1346,7 @@ Rules for the JSON you return:
     if (f === "custom") {
       const ko = $("#customKo").value.trim();
       if (!ko || pending.translate) return;
+      $("#customKo").value = "";
       Object.assign(sessions.translate, { prompt: { ko, level: lvl("translate") }, queue: [], drill: null, text: "", fb: null, entryId: null, error: "" });
       render();
       $("#draft")?.focus();
@@ -1337,9 +1355,7 @@ Rules for the JSON you return:
     } else if (f === "reveal") {
       const c = data.cards.find(x => x.id === review.id);
       const guess = $("#guess").value.trim();
-      const g = normAns(guess), a = normAns(c?.expr || "");
-      // Exact match, the whole corrected sentence, or a short answer that contains the expected phrase.
-      const right = c && guess && (g === a || (c.fixed && g === normAns(c.fixed)) || (a && ` ${g} `.includes(` ${a} `) && words(guess) <= words(c.expr) + 4));
+      const right = c && guess && isRight(c, guess);
       review = { ...review, shown: true, guess, result: !guess ? null : right ? "right" : "wrong" };
       render();
       document.querySelector(review.result ? '.card [data-act="grade"].primary' : '.card [data-act="grade"][data-ok="0"]')?.focus();
