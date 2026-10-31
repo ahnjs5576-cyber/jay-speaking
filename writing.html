@@ -378,7 +378,7 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
     B1: [
       ["최근에 산 물건과 고른 이유", "Something I bought recently and why"], ["기억에 남는 생일", "A birthday I remember"],
       ["요즘 바쁜 이유", "Why I'm busy these days"], ["내가 사는 동네 소개", "My neighborhood"], ["최근에 본 영화나 드라마", "A movie or show I watched recently"],
-      ["어렸을 때 꿈", "My dream when I was a child"], ["스트레스를 푸는 방법", "How I relieve stress"], ["가장 기억에 남는 여행", "My most memorable trip"],
+      ["어렸을 때 꿈", "My dream when I was a child"], ["자주 가는 카페나 식당", "A cafe or restaurant I often go to"], ["최근에 배운 요리", "A dish I learned to cook recently"],
       ["이번 주말 계획", "My plans for this weekend"], ["새로 배우고 싶은 것", "Something new I want to learn"], ["최근에 한 실수", "A mistake I made recently"],
       ["내가 좋아하는 장소와 이유", "A place I like and why"]],
     B2: [
@@ -408,6 +408,73 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
       ["익명성은 표현의 자유를 지키는가", "Does anonymity protect free speech?"], ["실패를 축하하는 문화는 가능한가", "Can a culture celebrate failure?"],
       ["취향은 타고나는가 만들어지는가", "Is taste innate or learned?"], ["느리게 사는 것의 가치", "The value of living slowly"]]
   };
+  // More built-in prompts per level, mixing statements, questions, requests and conditionals across many topics.
+  const MORE = {
+    SENTENCES: {
+      A2: ["이 버스가 시청에 가나요?", "창문 좀 열어 줄 수 있어요?", "저는 고양이 두 마리를 키워요.", "매운 음식을 잘 못 먹어요.", "우리 엄마는 간호사예요.",
+        "영화가 몇 시에 시작해요?", "지금 밖에 눈이 와요.", "저는 아침을 거의 안 먹어요.", "이 셔츠를 입어 봐도 돼요?", "우리는 토요일마다 축구를 해요.",
+        "내 생일은 3월 12일이에요.", "그 가게는 일요일에 문을 닫아요.", "물 한 병 주세요.", "저는 작년에 운전을 배웠어요.", "오늘 저녁에 뭐 먹고 싶어요?",
+        "제 사무실은 5층에 있어요.", "어제 휴대폰을 잃어버렸어요.", "다음 주에 시험이 두 개 있어요.", "저는 수영을 못 해요.", "방이 너무 더워서 에어컨을 켰어요.",
+        "주말에 보통 늦잠을 자요.", "이 길로 쭉 가면 역이 나와요.", "친구 생일 선물로 꽃을 샀어요.", "저는 아직 그 영화를 안 봤어요.", "지하철이 버스보다 빨라요."],
+      B1: ["제가 보낸 이메일 받으셨어요?", "이 서류를 금요일까지 내야 하나요?", "만약 내일 비가 오면 소풍은 다음 주로 미룰게요.", "요즘 잠들기 전에 휴대폰을 덜 보려고 노력하고 있어요.",
+        "그 박물관은 생각보다 훨씬 컸어요.", "택시를 타는 것보다 걸어가는 게 더 빠를 거예요.", "외국인 친구를 사귀고 싶어서 언어 교환 모임에 나가요.", "회사까지 지하철로 40분 정도 걸려요.",
+        "그 가수의 콘서트 표가 5분 만에 다 팔렸어요.", "냉장고에 우유가 다 떨어졌으니까 오는 길에 좀 사 올래요?", "처음 만났을 때 그 사람이 좀 무서워 보였어요.", "이 앱 덕분에 매일 물을 더 많이 마시게 됐어요.",
+        "휴가 때 어디에 갈지 아직 고민 중이에요.", "한국에 온 지 얼마나 됐어요?", "저는 혼자 여행하는 것을 좋아하는 편이에요.", "어제 회의에서 제 의견을 말할 기회가 없었어요.",
+        "그 셔츠가 너한테 잘 어울릴 것 같아.", "지갑을 집에 두고 와서 친구가 대신 계산해 줬어요.", "이번 프로젝트는 예상보다 시간이 오래 걸리고 있어요.", "하루에 커피를 세 잔 이상 마시지 않으려고 해요.",
+        "아이들이 놀이터에서 신나게 놀고 있어요.", "그 사람 이름이 기억나지 않아요."],
+      B2: ["그 제안을 받아들일지 말지 아직 결정하지 못했어요.", "이 보고서는 다음 주 월요일까지 검토되어야 해요.", "제가 그 자리에 있었다면 아마 다르게 행동했을 거예요.",
+        "요즘은 재택근무를 허용하는 회사가 점점 늘고 있어요.", "그 사람이 그렇게 말한 의도를 잘 모르겠어요.", "계약서에 서명하기 전에 조건을 꼼꼼히 확인하세요.",
+        "그는 회의 내내 한마디도 하지 않았어요.", "저는 사람들이 생각하는 것만큼 외향적이지 않아요.", "환불을 받으려면 영수증이 꼭 있어야 한대요.",
+        "이 문제에 대해 전문가의 의견을 들어 보는 게 좋겠어요.", "여행 중에 만난 사람들과 아직도 연락하고 지내요.", "가격이 오르기 전에 미리 사 둘 걸 그랬어요.",
+        "그 강의는 실무에 바로 써먹을 수 있는 내용이 많았어요.", "이 동네는 십 년 전과 비교하면 몰라보게 달라졌어요.", "저는 결정을 내리기 전에 장단점을 적어 보는 편이에요.",
+        "늦게 답장해서 미안해요. 요즘 정신이 하나도 없었어요."],
+      C1: ["그 결정이 장기적으로 어떤 영향을 미칠지는 아무도 장담할 수 없어요.", "그는 비판을 개인적인 공격으로 받아들이는 경향이 있어요.", "우리가 당연하게 여기던 것들이 사실은 누군가의 노력 덕분이었어요.",
+        "회의가 길어질수록 정작 중요한 결정은 미뤄지기 일쑤예요.", "솔직히 말하면, 그 계획이 성공할 가능성은 높지 않다고 봐요.", "그녀의 조언이 없었다면 저는 아마 중간에 포기했을 거예요.",
+        "기술이 발전한다고 해서 삶이 반드시 더 편해지는 건 아니에요.", "그 회사는 고객의 불만을 무시하다가 결국 큰 대가를 치렀어요.", "서로의 입장을 이해하려는 노력 없이는 타협이 불가능해요.",
+        "처음에는 사소한 오해였지만 점점 감정의 골이 깊어졌어요.", "이 연구 결과는 기존의 통념과 정면으로 배치돼요.", "그가 그렇게까지 화를 낸 데에는 말 못 할 사정이 있었던 것 같아요.",
+        "마감에 쫓기다 보면 실수를 하기 마련이니 미리 시작하세요.", "그 영화는 평론가들에게는 혹평을 받았지만 관객들에게는 큰 사랑을 받았어요.", "무엇보다 중요한 건 같은 실수를 되풀이하지 않는 거예요.",
+        "요즘 젊은 세대는 집을 사는 것보다 경험에 돈을 쓰는 걸 선호해요."],
+      C2: ["그의 말에는 겸손을 가장한 오만함이 묻어 있었어요.", "규제가 혁신을 가로막는다는 주장은 반만 맞는 말이에요.", "그 소설은 읽을수록 처음에는 보이지 않던 층위가 드러나요.",
+        "모두가 정답을 안다고 착각하는 순간 질문은 사라져요.", "그 협상은 서로 체면을 세워 주는 선에서 마무리됐어요.", "그는 자신이 틀렸을 가능성을 단 한 번도 염두에 두지 않았어요.",
+        "편리함의 대가가 무엇인지 우리는 너무 늦게 깨닫곤 해요.", "그 정책이 실패한 원인을 한 가지로 환원하는 건 지나친 단순화예요.", "그녀는 침묵으로 동의를 표하는 데 익숙한 사람이었어요.",
+        "우리가 기억하는 과거는 늘 어느 정도 각색되어 있기 마련이에요.", "그 기업의 사과문은 책임을 인정하는 듯하면서도 교묘하게 피해 갔어요.", "아이러니하게도 선택지가 많아질수록 결정은 더 어려워져요."]
+    },
+    BASES: {
+      A2: ["It snowed.", "I took a shower.", "She read a magazine.", "We met at the station.", "I lost my umbrella.", "He drove to work.", "I called a taxi.",
+        "The baby cried.", "We went to the beach.", "I made a cake.", "She bought new shoes.", "I visited my uncle.", "They watched a movie."],
+      B1: ["The flight was cancelled.", "I fixed my bike.", "She got a promotion.", "We tried a new restaurant.", "I forgot my password.", "He learned to drive.",
+        "The kids were noisy.", "I sold my old car.", "She broke her arm.", "We got lost.", "I finished the report.", "The neighbors complained.", "My sister got married."],
+      B2: ["The price doubled.", "He quit smoking.", "The road was closed.", "She declined the invitation.", "Our team lost the contract.", "The internet went down.",
+        "I changed my mind.", "The landlord raised the rent.", "The interview went well."],
+      C1: ["The merger fell through.", "Public trust declined.", "The law was amended.", "Sales plateaued.", "She stepped down.", "The project ran over budget.",
+        "Critics praised the film.", "The village emptied out.", "The deal was renegotiated.", "Prices stabilized."],
+      C2: ["The rumor gained traction.", "Ambition outpaced caution.", "The ruling set a precedent.", "Consensus quietly eroded.", "The scandal blew over.",
+        "Nostalgia sells.", "The experiment backfired.", "Loyalty has limits.", "The silence was deliberate.", "Tradition bent but did not break."]
+    },
+    TOPICS: {
+      A2: [["내가 자주 가는 가게", "A shop I often go to"], ["오늘 입은 옷", "What I'm wearing today"], ["내 휴대폰에 있는 앱", "Apps on my phone"], ["좋아하는 운동", "A sport I like"],
+        ["어렸을 때 좋아한 장난감", "A toy I loved as a child"], ["우리 동네 날씨", "The weather where I live"], ["키우고 싶은 동물", "An animal I want to have"], ["주말 아침", "My weekend mornings"],
+        ["좋아하는 노래", "A song I like"], ["내가 잘 만드는 음식", "A dish I can make"], ["출근길 또는 등굣길", "My way to work or school"], ["최근에 산 것", "Something I bought recently"],
+        ["생일에 받고 싶은 선물", "A present I want for my birthday"]],
+      B1: [["처음으로 해 본 일", "Something I did for the first time"], ["좋아했던 선생님", "A teacher I liked"], ["내 방에서 가장 소중한 물건", "The most precious thing in my room"],
+        ["최근에 친구와 한 일", "What I did with a friend recently"], ["돈을 아끼는 방법", "How I save money"], ["잠이 안 올 때 하는 일", "What I do when I can't sleep"],
+        ["가장 좋아하는 명절", "My favorite holiday"], ["요즘 자주 듣는 음악", "Music I listen to a lot these days"], ["추천하고 싶은 책이나 앱", "A book or app I recommend"],
+        ["기억에 남는 음식", "A meal I remember"], ["10년 후의 나", "Me in ten years"], ["비 오는 날 하는 일", "What I do on rainy days"], ["최근에 고마웠던 일", "Something I was thankful for recently"]],
+      B2: [["가장 힘들었던 결정", "The hardest decision I've made"], ["온라인 수업과 대면 수업", "Online vs in-person classes"], ["내가 일하는(공부하는) 방식", "How I work or study"],
+        ["좋은 동료의 조건", "What makes a good colleague"], ["여행에서 배운 것", "What travel taught me"], ["돈을 쓰고 후회한 경험", "Money I regret spending"],
+        ["SNS를 쓰는 이유", "Why I use social media"], ["건강을 위해 하는 일", "What I do for my health"], ["최근 뉴스에 대한 생각", "My thoughts on recent news"]],
+      C1: [["직업 선택에서 가장 중요한 것", "What matters most in choosing a career"], ["도시 생활의 장단점", "The pros and cons of city life"], ["실수를 대하는 태도", "How I deal with mistakes"],
+        ["세대 차이를 느낀 순간", "A moment I felt a generation gap"], ["광고가 소비에 미치는 영향", "How advertising shapes what we buy"], ["친구 관계가 변하는 이유", "Why friendships change"],
+        ["자꾸 미루게 되는 일", "Something I keep putting off"], ["번아웃을 피하는 방법", "How to avoid burnout"], ["교육에서 바뀌어야 할 것", "What should change in education"]],
+      C2: [["진정성은 연출될 수 있는가", "Can authenticity be staged?"], ["기술 발전과 일자리", "Technology and the future of work"], ["공정함과 평등의 차이", "Fairness versus equality"],
+        ["관용에도 한계가 있는가", "Does tolerance have limits?"], ["역사를 어떻게 기억해야 하는가", "How should we remember history?"], ["행복은 목표가 될 수 있는가", "Can happiness be a goal?"],
+        ["전문가를 얼마나 믿어야 하는가", "How far should we trust experts?"], ["소비가 정체성을 만드는가", "Does what we buy define us?"], ["침묵도 의견인가", "Is silence a position?"],
+        ["개인의 자유와 공동체의 이익", "Individual freedom versus the common good"], ["예술은 쓸모가 있어야 하는가", "Must art be useful?"]]
+    }
+  };
+  for (const [lv, list] of Object.entries(MORE.SENTENCES)) SENTENCES[lv].push(...list);
+  for (const [lv, list] of Object.entries(MORE.BASES)) BASES[lv].push(...list);
+  for (const [lv, list] of Object.entries(MORE.TOPICS)) TOPICS[lv].push(...list);
   const DIARY_RANGE = { A2: [3, 4], B1: [3, 5], B2: [3, 5], C1: [4, 6], C2: [5, 7] };
   // What each level is judged against, for Claude's grading.
   const LEVEL_BAR = {
@@ -545,6 +612,17 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
   const lvl = mode => data.levels[mode].level;
   const todayTopic = () => { const list = TOPICS[lvl("diary")]; const [topic, en] = list[Math.floor(startOfDay(Date.now()) / DAY) % list.length]; return { topic, en, level: lvl("diary") }; };
   // Pick a prompt at the mode's level, skipping ones already written in this mode while any are left.
+  // Pick a prompt at the mode's level that hasn't been written yet and looks least like the ones seen lately
+  // (shared character pairs and the same sentence ending), so consecutive prompts differ in topic and shape.
+  const seenPrompts = { translate: [], expand: [], diary: [] };
+  const grams = t => { const x = String(t).toLowerCase().replace(/\s+/g, " "), g = new Set(); for (let i = 0; i < x.length - 1; i++) g.add(x.slice(i, i + 2)); return g; };
+  const ending = t => String(t).replace(/[\s.?!]+$/, "").slice(-3);
+  function likeness(a, b) {
+    const ga = grams(a), gb = grams(b);
+    let n = 0;
+    for (const x of ga) if (gb.has(x)) n++;
+    return n / Math.max(1, Math.min(ga.size, gb.size)) + (ending(a) === ending(b) ? 0.3 : 0);
+  }
   function freshPrompt(mode, cur) {
     const lv = lvl(mode);
     const all = mode === "translate" ? SENTENCES[lv].map(ko => ({ ko, level: lv }))
@@ -553,7 +631,16 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
     const done = new Set(data.entries.filter(e => e.mode === mode).map(e => promptKey(e.prompt)));
     let pool = all.filter(p => !done.has(promptKey(p)) && promptKey(p) !== promptKey(cur));
     if (!pool.length) pool = all.filter(p => promptKey(p) !== promptKey(cur)).map(p => ({ ...p, repeat: true }));
-    return pool[Math.floor(Math.random() * pool.length)] || all[0];
+    if (!pool.length) return all[0];
+    // Prompts shown recently but skipped stay out for a while too, unless nothing else is left.
+    const shown = new Set(seenPrompts[mode] || []), unseen = pool.filter(p => !shown.has(promptKey(p)));
+    if (unseen.length) pool = unseen;
+    const recent = [...data.entries.filter(e => e.mode === mode).slice(-5).map(e => promptKey(e.prompt)), ...(seenPrompts[mode] || []).slice(-6), promptKey(cur)].filter(Boolean);
+    const scored = pool.map(p => ({ p, score: recent.length ? Math.max(...recent.map(r => likeness(promptKey(p), r))) : 0 })).sort((a, b) => a.score - b.score);
+    const best = scored.slice(0, Math.max(1, Math.ceil(scored.length / 3)));
+    const pick = best[Math.floor(Math.random() * best.length)].p;
+    if (seenPrompts[mode]) { seenPrompts[mode].push(promptKey(pick)); seenPrompts[mode] = seenPrompts[mode].slice(-20); }
+    return pick;
   }
   // After each first draft: three in a row averaging UP_AT+ moves up a level, two averaging under DOWN_AT moves down.
   function levelScores(mode) {
@@ -810,20 +897,29 @@ Rules for the JSON you return:
     countability: "The English translation must use uncountable or tricky nouns (advice, information, equipment, feedback, furniture) and their quantifiers.",
     verb_pattern: "The English translation must need verb patterns such as stop/remember/try + to-infinitive vs -ing, make/let/have + object + verb, suggest/recommend + that-clause."
   };
+  // Each generated item gets its own topic and sentence type, so a batch never comes back as near-copies.
+  const GEN_THEMES = ["work and meetings", "travel", "food and cooking", "health and exercise", "money and shopping", "family", "friendship", "technology",
+    "school and learning", "weather and seasons", "city life", "nature and the environment", "hobbies", "news and society", "feelings", "plans and decisions",
+    "customer service", "neighbours", "transport", "culture and media"];
+  const GEN_SHAPES = ["a statement", "a question", "a request or suggestion", "a conditional (if ...)", "a sentence with a reason (because / so)", "a contrast (but / although)", "a sentence about the past", "a sentence about future plans"];
+  const pickSome = (list, n) => [...list].sort(() => Math.random() - 0.5).slice(0, n);
   async function generate(mode, { focus = null, n = 3 } = {}) {
     const level = lvl(mode);
-    const avoid = data.entries.filter(e => e.mode === mode).slice(-12).map(e => promptKey(e.prompt)).join(" / ");
+    const avoid = [...new Set([...data.entries.filter(e => e.mode === mode).slice(-20).map(e => promptKey(e.prompt)), ...(sessions[mode]?.queue || []).map(promptKey)])].join(" / ");
+    const themes = pickSome(GEN_THEMES, n), shapes = pickSome(GEN_SHAPES, n);
+    const variety = `Make the items clearly different from each other: item 1 is about ${themes[0]}${themes[1] ? `, item 2 about ${themes[1]}` : ""}${themes[2] ? `, item 3 about ${themes[2]}` : ""}` +
+      (mode === "translate" && !REVISE_CATS.includes(focus) ? `, and they are, in order, ${shapes.join(", ")}, each with a different sentence ending.` : ".");
     let user;
     if (mode === "translate" && REVISE_CATS.includes(focus)) {
-      user = `Write ${n} short English paragraphs of 3 or 4 sentences (one per item, in "text"; "en" is "") on everyday work or life topics, each written as a CEFR ${level} learner might, with several clear problems in ${CAT_EN[focus]} but otherwise mostly correct. The learner will revise them, so do not mark or explain the problems.`;
+      user = `Write ${n} short English paragraphs of 3 or 4 sentences (one per item, in "text"; "en" is "") on everyday topics, each written as a CEFR ${level} learner might, with several clear problems in ${CAT_EN[focus]} but otherwise mostly correct. The learner will revise them, so do not mark or explain the problems. ${variety}`;
     } else if (mode === "translate") {
       user = `Write ${n} natural Korean sentences (one per item, in "text"; "en" is "") for a Korean adult to translate into English at CEFR ${level}. ` +
         (focus ? `Each sentence must naturally require correct use of ${CAT_EN[focus]}, which this learner often gets wrong, in a different way each time. ${DRILL_HINT[focus] || ""} ` : "Vary the grammar and the topic (work, daily life, relationships, opinions, society). ") +
-        `Make them sound like something a Korean adult would really say or write, 1 sentence each, level-appropriate.`;
+        `Make them sound like something a Korean adult would really say or write, 1 sentence each, level-appropriate. ${variety}`;
     } else if (mode === "expand") {
-      user = `Write ${n} short, plain English base sentences of 3 to 7 words (in "text"; "en" is "") that a CEFR ${level} learner can expand with ${EXPAND_GUIDE[level].focus}. Use varied subjects and situations.`;
+      user = `Write ${n} short, plain English base sentences of 3 to 7 words (in "text"; "en" is "") that a CEFR ${level} learner can expand with ${EXPAND_GUIDE[level].focus}. ${variety} Use different subjects (I, she, we, they, a thing).`;
     } else {
-      user = `Write ${n} diary topics for a CEFR ${level} writer (Korean topic in "text", English translation in "en"). ${level === "A2" ? "Simple everyday topics: daily routine, family, food, weekends." : level === "B1" ? "Familiar personal experiences and plans, with a reason." : level === "B2" ? "Personal experiences with a reason or lesson." : level === "C1" ? "Reflective or opinion topics about work, society or relationships." : "Debatable, abstract questions that reward nuance."}`;
+      user = `Write ${n} diary topics for a CEFR ${level} writer (Korean topic in "text", English translation in "en"). ${level === "A2" ? "Simple everyday topics: daily routine, family, food, weekends." : level === "B1" ? "Familiar personal experiences and plans, with a reason." : level === "B2" ? "Personal experiences with a reason or lesson." : level === "C1" ? "Reflective or opinion topics about work, society or relationships." : "Debatable, abstract questions that reward nuance."} ${variety}`;
     }
     if (avoid) user += ` Do not repeat these: ${avoid}`;
     const r = await callClaude({ system: GEN_SYSTEM, user, schema: GEN_SCHEMA, shape: GEN_SHAPE, effort: "low" });
@@ -928,7 +1024,7 @@ Rules for the JSON you return:
       <div class="row lvrow"><span class="level">${promptLevel(s.prompt)}</span><span class="note">${s.prompt.revise ? "레벨 점수에는 들어가지 않는 집중 연습이에요" : promptLevel(s.prompt) !== lvl(mode) ? `레벨이 ${lvl(mode)}로 바뀌었어요 · 다음 문제부터 적용돼요` : levelProgress(mode)}</span></div>`;
     let tools = "";
     if (s.prompt.focus) tools += `<div class="drill">집중 연습 · <b>${CATS[s.prompt.focus]}</b>${s.drill ? ` ${s.drill.total - s.queue.length}/${s.drill.total}` : ""} — 이 부분을 특히 신경 써서 써 보세요.</div>`;
-    if (s.prompt.repeat && !s.fb) tools += `<p class="note">준비된 문제를 모두 풀었어요. 'AI 새 문제'로 새 문제를 받을 수 있어요.</p>`;
+    if (s.prompt.repeat && !s.fb) tools += `<p class="note">${s.gen ? "준비된 문제를 모두 풀어서 Claude가 새 문제를 만들고 있어요…" : "준비된 문제를 모두 풀었어요. 'AI 새 문제'로 새 문제를 받을 수 있어요."}</p>`;
     if (mode === "translate" && !s.fb && !busy && !s.prompt.focus) tools += `
       <form class="row custom" data-form="custom"><label class="visually-hidden" for="customKo">직접 넣을 한국어 문장</label>
         <input id="customKo" placeholder="한국어 문장 직접 넣기">${micBtn("customKo", "ko-KR", "", false, true)}<button class="btn small">이 문장으로</button></form>${micStatus("customKo")}`;
@@ -1434,6 +1530,8 @@ Rules for the JSON you return:
     const s = sessions[mode];
     if (s.queue?.length) s.prompt = s.queue.shift();
     else { s.prompt = freshPrompt(mode, s.prompt); s.drill = null; }
+    // The built-in set is used up: ask Claude for fresh prompts instead of repeating old ones.
+    if (s.prompt.repeat && canAsk() && !s.gen && !pending[mode]) setTimeout(() => aiPrompt(mode));
     if (dict && dict.tab === mode) stopDictation();
     Object.assign(s, { text: s.prompt.revise || "", fb: null, entryId: null, error: "", levelChange: null, saved: null, ...NO_VOICE });
   }
