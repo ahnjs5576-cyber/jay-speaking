@@ -273,7 +273,7 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
       <li>다음 날 '다시 쓰기'에서 피드백을 보지 않고 다시 써요.</li>
       <li>내 실수와 새 표현은 '복습 카드'로 반복하고, '약점 리포트'에서 자주 틀리는 패턴을 집중 연습해요.</li>
     </ol>
-    <p class="note">레벨은 B2에서 시작해 점수에 따라 C1·C2로 자동으로 바뀌어요.</p>
+    <p class="note">레벨은 B2에서 시작해 점수에 따라 A2·B1·B2·C1·C2 사이에서 자동으로 바뀌어요.</p>
     <div><button class="btn small primary" type="button" data-act="closeIntro">시작하기</button></div>
   </section>
 
@@ -299,9 +299,19 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
 
 <script type="module">
   /* ---------- content ---------- */
-  // Practice starts at B2 and moves between B2, C1 and C2 per mode, following the scores (see adjustLevel).
-  const LEVELS = ["B2", "C1", "C2"];
+  // Practice starts at B2 and moves between A2 and C2 per mode, following the scores (see adjustLevel).
+  const LEVELS = ["A2", "B1", "B2", "C1", "C2"];
   const SENTENCES = {
+    A2: ["저는 매일 아침 일곱 시에 일어나요.", "어제 친구와 같이 점심을 먹었어요.", "이 근처에 은행이 있나요?", "저는 주말마다 공원에서 산책해요.",
+      "오늘은 날씨가 정말 추워요.", "제 동생은 저보다 키가 커요.", "지난 여름에 부산에 갔어요.", "저는 커피보다 차를 더 좋아해요.",
+      "버스가 늦게 와서 회사에 늦었어요.", "내일 비가 올 거예요.", "저는 영어를 배우고 싶어요.", "이 가방은 너무 비싸요.",
+      "저녁에 보통 텔레비전을 봐요.", "어제 너무 피곤해서 일찍 잤어요.", "우리 집 근처에 큰 마트가 있어요."],
+    B1: ["시간이 있으면 같이 영화 보러 갈래요?", "저는 영어를 공부한 지 2년 됐어요.", "어제 산 신발이 조금 작아서 바꿔야 해요.",
+      "회의가 끝나면 전화해 줄 수 있어요?", "요즘 일이 많아서 운동을 거의 못 하고 있어요.", "제가 어렸을 때 살던 동네는 아주 조용했어요.",
+      "그 식당은 음식은 맛있지만 항상 사람이 많아요.", "다음 달에 이사할 계획이에요.", "길을 잃어서 지나가던 사람에게 길을 물어봤어요.",
+      "그 책은 생각했던 것보다 훨씬 쉬웠어요.", "주말에 뭘 할지 아직 정하지 못했어요.", "감기에 걸려서 하루 종일 집에서 쉬었어요.",
+      "저는 사람들 앞에서 말하는 게 아직 어려워요.", "그 영화를 본 적이 있어서 다른 걸 보고 싶어요.", "늦을 것 같으면 미리 알려 주세요.",
+      "새로 산 휴대폰은 배터리가 오래 가요.", "친구가 추천해 준 카페에 처음 가 봤어요.", "비가 많이 와서 여행을 취소했어요."],
     B2: ["미리 알았더라면 다른 결정을 내렸을 거예요.", "그 회의에서 나온 의견 대부분은 이미 검토된 것들이었어요.", "일이 바빠질수록 오히려 운동할 시간을 더 챙기게 돼요.",
       "이 프로젝트가 끝날 때쯤이면 팀원 모두가 많이 성장해 있을 거예요.", "그가 그렇게 화를 낸 건 처음 봤어요.", "비용이 생각보다 많이 들어서 계획을 수정할 수밖에 없었어요.",
       "솔직히 말하면 그 제안이 그렇게 매력적이지는 않았어요.", "아무리 바빠도 가족과 저녁은 꼭 함께 먹으려고 해요.", "처음 이 도시에 왔을 때는 모든 게 낯설고 어색했어요.",
@@ -328,6 +338,10 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
       "그 계획은 종이 위에서는 완벽했지만 현실의 벽에 부딪혔어요.", "아무도 책임지려 하지 않는 사이에 문제는 걷잡을 수 없이 커졌어요."]
   };
   const BASES = {
+    A2: ["I went shopping.", "She cooked dinner.", "We played soccer.", "I drank coffee.", "He called his mom.", "I watched TV.",
+      "They took a bus.", "I bought a book.", "She cleaned the house.", "We ate pizza.", "I studied English.", "He went to bed."],
+    B1: ["I was late.", "She started a new job.", "We visited my grandparents.", "My phone stopped working.", "I cooked for my friends.",
+      "He lost his wallet.", "We moved to a new apartment.", "I joined a gym.", "The store was closed.", "She passed the exam.", "I missed the train.", "We had a party."],
     B2: ["The meeting was postponed.", "She changed her job.", "I missed the deadline.", "The city has changed.", "We decided to cancel the trip.",
       "He apologized.", "Prices went up.", "I started a new hobby.", "The team won the game.", "My friend moved abroad.", "The train was delayed.",
       "She lost her keys.", "We ordered pizza.", "The concert was cancelled.", "I learned to swim.", "He fixed the printer."],
@@ -339,6 +353,12 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
       "The truce held.", "Old rivalries resurfaced.", "The apology rang hollow.", "Quiet competence was rewarded.", "The market shrugged."]
   };
   const EXPAND_GUIDE = {
+    A2: { goal: 10, hint: "언제·어디서·누구와를 붙이고, and·but·because로 이어 보세요.",
+      chips: ["언제 (yesterday, at 7)", "어디서 (at, in)", "누구와 (with)", "이유 (because)", "그리고·그래서 (and, so)"],
+      focus: "time and place phrases, with + person, and simple connectors (and, but, because, so)" },
+    B1: { goal: 15, hint: "when·after로 시간을, because·so로 이유와 결과를 붙이고, who·which로 사람이나 물건을 설명해 보세요.",
+      chips: ["시간 (when, after)", "이유 (because)", "결과 (so)", "대조 (but, although)", "관계사 (who, which)"],
+      focus: "time clauses (when, after, before), reason and result (because, so), contrast (but, although) and simple relative clauses (who, which)" },
     B2: { goal: 22, hint: "관계사절과 분사구로 정보를 덧붙이고, although·so that 같은 연결어로 이유와 결과를 이어 보세요.",
       chips: ["관계사절 (who, which)", "분사구 (-ing, -ed)", "양보 (although)", "시간·이유", "목적·결과 (so that)"],
       focus: "relative clauses, participle phrases, concession (although / even though) and clear time, reason and result links" },
@@ -350,6 +370,17 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
       focus: "inversion or cleft sentences for emphasis, nominalisation, precise verbs, implication and concision with no padding" }
   };
   const TOPICS = {
+    A2: [
+      ["오늘 아침에 한 일", "What I did this morning"], ["내가 좋아하는 음식", "My favorite food"], ["우리 가족 소개", "My family"],
+      ["지난 주말에 한 일", "What I did last weekend"], ["내 방 소개", "My room"], ["내가 좋아하는 계절", "My favorite season"],
+      ["오늘 날씨와 기분", "Today's weather and my mood"], ["내 친한 친구", "My close friend"], ["내 하루 일과", "My daily routine"],
+      ["가고 싶은 나라", "A country I want to visit"], ["내 취미", "My hobby"], ["어제 저녁에 먹은 것", "What I ate for dinner yesterday"]],
+    B1: [
+      ["최근에 산 물건과 고른 이유", "Something I bought recently and why"], ["기억에 남는 생일", "A birthday I remember"],
+      ["요즘 바쁜 이유", "Why I'm busy these days"], ["내가 사는 동네 소개", "My neighborhood"], ["최근에 본 영화나 드라마", "A movie or show I watched recently"],
+      ["어렸을 때 꿈", "My dream when I was a child"], ["스트레스를 푸는 방법", "How I relieve stress"], ["가장 기억에 남는 여행", "My most memorable trip"],
+      ["이번 주말 계획", "My plans for this weekend"], ["새로 배우고 싶은 것", "Something new I want to learn"], ["최근에 한 실수", "A mistake I made recently"],
+      ["내가 좋아하는 장소와 이유", "A place I like and why"]],
     B2: [
       ["어제 가장 피곤했던 순간과 그 이유", "The most tiring moment yesterday, and why"], ["요즘 빠져 있는 것", "Something I'm into these days"],
       ["이번 주에 고마웠던 사람", "Someone I was thankful for this week"], ["최근에 산 물건 중 가장 만족스러운 것", "The best thing I bought recently"],
@@ -377,9 +408,11 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
       ["익명성은 표현의 자유를 지키는가", "Does anonymity protect free speech?"], ["실패를 축하하는 문화는 가능한가", "Can a culture celebrate failure?"],
       ["취향은 타고나는가 만들어지는가", "Is taste innate or learned?"], ["느리게 사는 것의 가치", "The value of living slowly"]]
   };
-  const DIARY_RANGE = { B2: [3, 5], C1: [4, 6], C2: [5, 7] };
+  const DIARY_RANGE = { A2: [3, 4], B1: [3, 5], B2: [3, 5], C1: [4, 6], C2: [5, 7] };
   // What each level is judged against, for Claude's grading.
   const LEVEL_BAR = {
+    A2: "CEFR A2: short, clear sentences about everyday topics using basic grammar (present and past simple, can/will, articles, common prepositions, and/but/because). Do not expect complex structures; a clear, correct simple answer scores 85 or more. Keep explanations short and simple.",
+    B1: "CEFR B1: connected, mostly accurate sentences on familiar topics (present perfect, future, comparatives, simple relative clauses, when/if/because/although). A correct, natural answer with simple but varied structures scores 85 or more; a few basic errors that block meaning score below 60.",
     B2: "CEFR B2: clear, accurate writing with a good range of structures (conditionals, relative clauses, passives, perfect tenses) and natural collocations. Plain but correct B1-style phrasing scores around 60-75.",
     C1: "CEFR C1: fluent, precise writing with idiomatic, well-chosen vocabulary, flexible complex sentences and appropriate register. Correct but unremarkable B2-style phrasing scores around 60-75.",
     C2: "CEFR C2: writing a careful educated native speaker would produce: precise nuance, natural idiom, concision, cohesion and controlled style. Correct but slightly textbook-like C1 phrasing scores around 65-80."
@@ -625,7 +658,7 @@ dialog input { min-height: 44px; border: 1px solid var(--line); border-radius: 1
   /* ---------- Claude ---------- */
   const MODEL = "claude-opus-5-5";
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.132.1/+esm";
-  const SYSTEM = `You are an English writing coach for Korean adults at CEFR B2 and above. You give fast, specific, encouraging feedback on short pieces of writing.
+  const SYSTEM = `You are an English writing coach for Korean adults at CEFR A2 to C2. You give fast, specific, encouraging feedback on short pieces of writing.
 
 Rules for the JSON you return:
 - All explanations (verdict, praise, why, note, meaning) are in natural Korean. English examples stay in English.
@@ -790,7 +823,7 @@ Rules for the JSON you return:
     } else if (mode === "expand") {
       user = `Write ${n} short, plain English base sentences of 3 to 7 words (in "text"; "en" is "") that a CEFR ${level} learner can expand with ${EXPAND_GUIDE[level].focus}. Use varied subjects and situations.`;
     } else {
-      user = `Write ${n} diary topics for a CEFR ${level} writer (Korean topic in "text", English translation in "en"). ${level === "B2" ? "Personal experiences with a reason or lesson." : level === "C1" ? "Reflective or opinion topics about work, society or relationships." : "Debatable, abstract questions that reward nuance."}`;
+      user = `Write ${n} diary topics for a CEFR ${level} writer (Korean topic in "text", English translation in "en"). ${level === "A2" ? "Simple everyday topics: daily routine, family, food, weekends." : level === "B1" ? "Familiar personal experiences and plans, with a reason." : level === "B2" ? "Personal experiences with a reason or lesson." : level === "C1" ? "Reflective or opinion topics about work, society or relationships." : "Debatable, abstract questions that reward nuance."}`;
     }
     if (avoid) user += ` Do not repeat these: ${avoid}`;
     const r = await callClaude({ system: GEN_SYSTEM, user, schema: GEN_SCHEMA, shape: GEN_SHAPE, effort: "low" });
@@ -1196,7 +1229,7 @@ Rules for the JSON you return:
     <section class="panel">
       <span class="label">레벨</span>
       <ul class="list lv">${Object.keys(MODES).map(m => `<li><div class="t"><b>${MODES[m].name}</b><span>${levelProgress(m)}</span></div><span class="level">${lvl(m)}</span></li>`).join("")}</ul>
-      <p class="note">모든 연습은 B2부터 시작해요. 같은 레벨에서 처음 쓴 글의 최근 3번 평균이 ${UP_AT}점 이상이면 한 단계 올라가고, 최근 2번 평균이 ${DOWN_AT}점 미만이면 한 단계 내려가요 (B2 아래로는 내려가지 않아요).</p>
+      <p class="note">모든 연습은 B2부터 시작해요. 같은 레벨에서 처음 쓴 글의 최근 3번 평균이 ${UP_AT}점 이상이면 한 단계 올라가고, 최근 2번 평균이 ${DOWN_AT}점 미만이면 한 단계 내려가요. 레벨은 A2부터 C2까지 있어요.</p>
       ${data.levelLog.length ? `<p class="note">${data.levelLog.slice(-5).reverse().map(c => `${md(new Date(c.ts))} ${MODES[c.mode].short} ${c.from}→${c.to}`).join(" · ")}</p>` : ""}
     </section>`;
   }
@@ -1441,7 +1474,7 @@ Rules for the JSON you return:
       drillBusy = null; render();
     }
   }
-  const QA_SYSTEM = "You are an English writing coach for Korean adults at CEFR B2 and above. Answer the learner's follow-up question about one correction in natural Korean, in 2 to 4 sentences, with one short English example. Reply only with the JSON requested.";
+  const QA_SYSTEM = "You are an English writing coach for Korean adults at CEFR A2 to C2. Answer the learner's follow-up question about one correction in natural Korean, in 2 to 4 sentences, with one short English example. Reply only with the JSON requested.";
   async function ask(i, q) {
     const s = sessions[tab], it = s.fb?.issues[i];
     if (!it || !q || s.asking != null) return;
